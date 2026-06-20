@@ -1,0 +1,20 @@
+{
+  "name": "@node-gman/tradeoffer-manager",
+  "version": "1.0.0",
+  "description": "Drop-in replacement for @tf2autobot/tradeoffer-manager that routes through g-mand daemon",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "node-gman": "file:../../",
+    "steamid": "^2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/steamid": "^2.0.4",
+    "typescript": "^5.4.5"
+  },
+  "license": "BSD-3-Clause"
+}

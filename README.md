@@ -1,0 +1,330 @@
+# node-gman
+
+TypeScript/Node.js SDK for [g-mand](https://github.com/lemon4ksan/g-man) — TF2 trading daemon.
+
+## Installation
+
+```bash
+npm install node-gman
+```
+
+## Quick Start
+
+```typescript
+import { GManClient, TradeOfferManagerAdapter, SteamUserAdapter } from 'node-gman';
+
+// Connect to g-mand daemon
+const client = new GManClient({
+  netType: 'tcp',           // 'tcp' or 'unix'
+  address: '127.0.0.1:50051',
+});
+
+// Check status
+const status = await client.getStatus();
+console.log(`Steam ID: ${status.steam_id}, Connected: ${status.connected}`);
+
+// Create adapters
+const steamUser = new SteamUserAdapter(client);
+const tradeManager = new TradeOfferManagerAdapter(client, { pollInterval: 30000 });
+
+// Handle new offers
+tradeManager.on('newOffer', async (offer) => {
+  console.log(`New offer from ${offer.partner}`);
+  
+  // Accept the offer
+  await client.execAction(440, 'accept-offer', { offer_id: offer.tradeofferid });
+});
+
+// Start polling
+tradeManager.startPolling();
+```
+
+## Connection
+
+### Via environment variables
+
+```bash
+GMAN_IPC_NET=tcp
+GMAN_IPC_ADDR=127.0.0.1:50051
+```
+
+### Via constructor
+
+```typescript
+const client = new GManClient({
+  netType: 'unix',
+  address: '/home/user/.config/gman/gman.sock',
+});
+```
+
+### Auto-detection
+
+- **Windows:** `tcp://127.0.0.1:50051`
+- **Linux/macOS:** `unix://~/.config/gman/gman.sock`
+
+## Classes
+
+### GManClient
+
+Main gRPC client for communicating with g-mand.
+
+```typescript
+const client = new GManClient(options?);
+```
+
+**Methods:**
+
+| Method | Description |
+|---|---|
+| `getStatus()` | Connection status |
+| `playGame(appid)` | Launch a game |
+| `exitGame()` | Exit the game |
+| `execAction(appid, action, params)` | Execute an action |
+| `streamEvents()` | Stream events |
+| `updateManualPrices(prices)` | Update prices |
+| `freeMemory()` | Free memory |
+| `stopDaemon()` | Stop daemon |
+| `guardCode()` | Steam Guard code |
+| `guardStatus()` | Guard status |
+| `guardList()` | List confirmations |
+| `guardRespond(id, accept)` | Respond to confirmation |
+| `guardImport(...)` | Import Guard secrets |
+| `close()` | Close connection |
+
+### SteamUserAdapter
+
+Adapter for Steam connection (emulates `steam-user`).
+
+```typescript
+const steamUser = new SteamUserAdapter(client);
+```
+
+**Events:**
+- `loggedOn` — successful login
+- `webSession` — web session established
+- `error` — error occurred
+
+**Methods:**
+- `gamesPlayed(appid)` — launch a game
+- `chatMessage(steamID, message)` — send a message
+
+### TeamFortress2Adapter
+
+Adapter for TF2 Game Coordinator (emulates `@tf2autobot/tf2`).
+
+```typescript
+const tf2 = new TeamFortress2Adapter(client);
+```
+
+**Properties:**
+- `haveGCSession` — whether connected to GC
+
+**Events:**
+- `connectedToGC` — connected to GC
+- `disconnectedFromGC` — disconnected from GC
+- `itemAcquired` — item received
+- `itemRemoved` — item removed
+- `itemChanged` — item changed
+
+**Methods:**
+- `craft(assetids, recipe?)` — craft items
+- `useItem(assetid)` — use an item
+- `deleteItem(assetid)` — delete an item
+- `sortBackpack(type)` — sort backpack
+
+### TradeOfferManagerAdapter
+
+Adapter for managing trade offers.
+
+```typescript
+const tradeManager = new TradeOfferManagerAdapter(client, {
+  pollInterval: 30000, // polling interval in ms
+});
+```
+
+**Properties:**
+- `pollData` — polling data
+- `pollInterval` — polling interval
+
+**Events:**
+- `newOffer` — new incoming offer
+- `offerChanged` — offer status changed
+- `poll` — polling data updated
+- `error` — error occurred
+
+**Methods:**
+- `startPolling()` — start polling
+- `stopPolling()` — stop polling
+- `client.execAction(...)` — direct g-mand call
+
+### SteamCommunityAdapter
+
+Adapter for Steam Community (emulates `@tf2autobot/steamcommunity`).
+
+```typescript
+const community = new SteamCommunityAdapter(client, { steamID: '...' });
+```
+
+## Types
+
+```typescript
+interface TradeOffer {
+  tradeofferid: string;
+  partner: string;
+  trade_offer_state: number;
+  items_to_give?: TradeOfferItem[];
+  items_to_receive?: TradeOfferItem[];
+  message?: string;
+  data?: Record<string, unknown>;
+}
+
+interface TradeOfferItem {
+  appid: number;
+  contextid: string;
+  assetid: string;
+  amount: number;
+}
+
+interface PollData {
+  sent: Record<string, number>;
+  received: Record<string, number>;
+  offerData: Record<string, Record<string, unknown>>;
+}
+
+enum ETradeOfferState {
+  Invalid = 1,
+  Active = 2,
+  Accepted = 3,
+  Countered = 4,
+  Expired = 5,
+  Cancelled = 6,
+  Declined = 7,
+  InvalidItems = 8,
+  CreatedNeedsConfirmation = 9,
+  InEscrow = 10,
+}
+```
+
+## g-mand Actions
+
+Available actions via `client.execAction(440, action, params)`:
+
+### Trading
+
+| Action | Params | Description |
+|---|---|---|
+| `send-offer` | `offer_params` (JSON) | Send trade offer |
+| `accept-offer` | `offer_id` | Accept offer |
+| `decline-offer` | `offer_id` | Decline offer |
+| `cancel-offer` | `offer_id` | Cancel offer |
+| `check-escrow` | `offer` (JSON) | Check escrow |
+| `active-offers` | — | Active incoming offers |
+| `active-sent-offers` | — | Active outgoing offers |
+
+### Inventory
+
+| Action | Params | Description |
+|---|---|---|
+| `inventory` | — | Get inventory |
+| `get-partner-inventory` | `partner_id` | Partner's inventory |
+| `item-details` | `item_id` | Item details |
+| `sort-backpack` | `type`, `sort_type` | Sort backpack |
+
+### Crafting
+
+| Action | Params | Description |
+|---|---|---|
+| `craft` | `recipe`, `items` (JSON) | Craft items |
+| `craft-metal` | `type` | Combine metal |
+| `smelt-weapons` | `class` | Smelt weapons |
+| `condense-metal` | — | Condense metal |
+| `make-change` | `target_defindex`, `target_count` | Break down metal |
+
+### Other
+
+| Action | Params | Description |
+|---|---|---|
+| `send-chat` | `steam_id`, `message` | Send chat message |
+| `price-check` | `sku` | Check item price |
+| `backpack-value` | — | Backpack value |
+| `delete-item` | `item_id` | Delete item |
+| `use-item` | `item_id` | Use item |
+| `schema` | — | Get schema |
+
+## CLI
+
+```bash
+# Install
+npm install -g node-gman
+
+# Daemon status
+gmanctl-node status
+
+# Launch TF2
+gmanctl-node play 440
+
+# Send a message
+gmanctl-node exec 440 send-chat steam_id=76561198000000000 message=Hello
+
+# Check price
+gmanctl-node exec 440 price-check sku=5021;6
+
+# Stop daemon
+gmanctl-node stop
+```
+
+## Example: Simple Bot
+
+```typescript
+import { GManClient, TradeOfferManagerAdapter, SteamUserAdapter, TeamFortress2Adapter } from 'node-gman';
+
+async function main() {
+  const client = new GManClient();
+  const status = await client.getStatus();
+  
+  if (!status.connected) {
+    console.error('g-mand is not connected to Steam');
+    process.exit(1);
+  }
+
+  const steamUser = new SteamUserAdapter(client);
+  const tradeManager = new TradeOfferManagerAdapter(client);
+  const tf2 = new TeamFortress2Adapter(client);
+
+  // Wait for TF2 GC connection
+  await new Promise<void>((resolve) => {
+    if (tf2.haveGCSession) resolve();
+    else tf2.once('connectedToGC', () => resolve());
+  });
+
+  console.log('Bot started');
+
+  tradeManager.on('newOffer', async (offer) => {
+    console.log(`Offer from ${offer.partner}`);
+    
+    try {
+      // Accept all offers (example)
+      await client.execAction(440, 'accept-offer', { 
+        offer_id: offer.tradeofferid 
+      });
+      console.log(`Offer ${offer.tradeofferid} accepted`);
+      
+      // Send thank you message
+      await client.execAction(440, 'send-chat', {
+        steam_id: offer.partner,
+        message: 'Thanks for the trade!',
+      });
+    } catch (err) {
+      console.error('Error:', err);
+    }
+  });
+
+  tradeManager.startPolling();
+}
+
+main();
+```
+
+## License
+
+BSD-3-Clause

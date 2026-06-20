@@ -1,0 +1,39 @@
+{
+  "name": "node-gman",
+  "version": "1.0.0",
+  "description": "TypeScript/Node.js client SDK and CLI for the g-mand trade daemon",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "gmanctl-node": "dist/cli.js"
+  },
+  "scripts": {
+    "prebuild": "node -e \"const fs = require('fs'); if (!fs.existsSync('proto')) fs.mkdirSync('proto'); fs.copyFileSync('../proto/daemon.proto', 'proto/daemon.proto');\" && npx proto-loader-gen-types --keepCase --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=src/proto/ proto/daemon.proto",
+    "build": "npm run prebuild && tsc",
+    "cli": "node dist/cli.js",
+    "cli:dev": "ts-node src/cli.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.10.8",
+    "@grpc/proto-loader": "^0.7.13",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.12.12",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "keywords": [
+    "steam",
+    "tf2",
+    "trade",
+    "grpc",
+    "binding"
+  ],
+  "author": "",
+  "license": "BSD-3-Clause"
+}
