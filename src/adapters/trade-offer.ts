@@ -1,12 +1,12 @@
-import { EventEmitter } from 'events';
-import { GManClient } from '../client';
+import { EventEmitter } from "events";
+import { GManClient } from "../client";
 import {
   TradeOffer,
   TradeOfferItem,
   PollData,
   SendOfferParams,
   StreamEventsResponse,
-} from '../types';
+} from "../types";
 
 export interface TradeOfferManagerOptions {
   pollInterval?: number;
@@ -34,7 +34,7 @@ export const ETradeOfferState = {
 } as const;
 
 export interface OfferAction {
-  action: 'accept' | 'decline' | 'skip' | 'counter';
+  action: "accept" | "decline" | "skip" | "counter";
   reason: string;
   meta?: Record<string, unknown>;
 }
@@ -86,7 +86,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
       this._pollInterval = null;
     }
     if (this._eventStream) {
-      if (typeof this._eventStream.cancel === 'function') {
+      if (typeof this._eventStream.cancel === "function") {
         this._eventStream.cancel();
       }
       this._eventStream = null;
@@ -96,11 +96,13 @@ export class TradeOfferManagerAdapter extends EventEmitter {
   private async _poll(): Promise<void> {
     try {
       const [receivedResult, sentResult] = await Promise.all([
-        this.client.execAction(440, 'active-offers', {}),
-        this.client.execAction(440, 'active-sent-offers', {}),
+        this.client.execAction(440, "active-offers", {}),
+        this.client.execAction(440, "active-sent-offers", {}),
       ]);
 
-      const receivedOffers = this.parseOffersFromResponse(receivedResult.details);
+      const receivedOffers = this.parseOffersFromResponse(
+        receivedResult.details,
+      );
       const sentOffers = this.parseOffersFromResponse(sentResult.details);
 
       const newReceivedIds = new Set<string>();
@@ -116,10 +118,10 @@ export class TradeOfferManagerAdapter extends EventEmitter {
 
         if (prevState === undefined) {
           this._pollData.received[id] = newState;
-          this.emit('newOffer', offer);
+          this.emit("newOffer", offer);
         } else if (prevState !== newState) {
           this._pollData.received[id] = newState;
-          this.emit('offerChanged', { offer, oldState: prevState });
+          this.emit("offerChanged", { offer, oldState: prevState });
         }
 
         this._pollData.offerData[id] = offer.data || {};
@@ -137,32 +139,38 @@ export class TradeOfferManagerAdapter extends EventEmitter {
           this._pollData.sent[id] = newState;
         } else if (prevState !== newState) {
           this._pollData.sent[id] = newState;
-          this.emit('offerChanged', { offer, oldState: prevState });
+          this.emit("offerChanged", { offer, oldState: prevState });
         }
 
         this._pollData.offerData[id] = offer.data || {};
       }
 
       for (const id of Object.keys(this._pollData.received)) {
-        if (!newReceivedIds.has(id) && this._pollData.received[id] === ETradeOfferState.Active) {
+        if (
+          !newReceivedIds.has(id) &&
+          this._pollData.received[id] === ETradeOfferState.Active
+        ) {
           delete this._pollData.received[id];
         }
       }
 
       for (const id of Object.keys(this._pollData.sent)) {
-        if (!newSentIds.has(id) && this._pollData.sent[id] === ETradeOfferState.Active) {
+        if (
+          !newSentIds.has(id) &&
+          this._pollData.sent[id] === ETradeOfferState.Active
+        ) {
           delete this._pollData.sent[id];
         }
       }
 
-      this.emit('poll', this._pollData);
+      this.emit("poll", this._pollData);
     } catch (err) {
-      this.emit('error', err);
+      this.emit("error", err);
     }
   }
 
   private parseOffersFromResponse(details: string): TradeOffer[] {
-    if (!details || details.trim() === '' || details.trim() === '[]') {
+    if (!details || details.trim() === "" || details.trim() === "[]") {
       return [];
     }
     try {
@@ -199,10 +207,14 @@ export class TradeOfferManagerAdapter extends EventEmitter {
     }
 
     if (!offer.items_to_give && offer.ItemsToGive) {
-      offer.items_to_give = offer.ItemsToGive.map((item: any) => this.normalizeItem(item));
+      offer.items_to_give = offer.ItemsToGive.map((item: any) =>
+        this.normalizeItem(item),
+      );
     }
     if (!offer.items_to_receive && offer.ItemsToReceive) {
-      offer.items_to_receive = offer.ItemsToReceive.map((item: any) => this.normalizeItem(item));
+      offer.items_to_receive = offer.ItemsToReceive.map((item: any) =>
+        this.normalizeItem(item),
+      );
     }
 
     return offer as TradeOffer;
@@ -231,19 +243,19 @@ export class TradeOfferManagerAdapter extends EventEmitter {
       const stream = this.client.streamEvents();
       this._eventStream = stream;
 
-      stream.on('data', (data: any) => {
+      stream.on("data", (data: any) => {
         let evType = data.event_type;
-        const idx = evType.lastIndexOf('.');
+        const idx = evType.lastIndexOf(".");
         if (idx !== -1) {
           evType = evType.substring(idx + 1);
         }
-        if (evType.startsWith('*')) {
+        if (evType.startsWith("*")) {
           evType = evType.substring(1);
         }
 
         try {
           const payload = JSON.parse(data.payload_json);
-          if (evType === 'NewOfferEvent' && payload.Offer) {
+          if (evType === "NewOfferEvent" && payload.Offer) {
             const offer = this.normalizeOffer(payload.Offer);
             const id = offer.tradeofferid;
 
@@ -255,18 +267,20 @@ export class TradeOfferManagerAdapter extends EventEmitter {
             this._pollData.offerData[id] = offer.data || {};
 
             if (prevState === undefined) {
-              this.emit('newOffer', offer);
+              this.emit("newOffer", offer);
             } else if (prevState !== newState) {
-              this.emit('offerChanged', { offer, oldState: prevState });
+              this.emit("offerChanged", { offer, oldState: prevState });
             }
-            this.emit('poll', this._pollData);
-          } else if (evType === 'OfferChangedEvent' && payload.Offer) {
+            this.emit("poll", this._pollData);
+          } else if (evType === "OfferChangedEvent" && payload.Offer) {
             const offer = this.normalizeOffer(payload.Offer);
             const id = offer.tradeofferid;
 
             this.offersCache.set(id, offer);
             const isSent = offer.is_our_offer;
-            const prevState = isSent ? this._pollData.sent[id] : this._pollData.received[id];
+            const prevState = isSent
+              ? this._pollData.sent[id]
+              : this._pollData.received[id];
             const newState = offer.trade_offer_state;
 
             if (isSent) {
@@ -277,36 +291,45 @@ export class TradeOfferManagerAdapter extends EventEmitter {
             this._pollData.offerData[id] = offer.data || {};
 
             if (prevState !== newState) {
-              this.emit('offerChanged', { offer, oldState: prevState });
+              this.emit("offerChanged", { offer, oldState: prevState });
             }
-            this.emit('poll', this._pollData);
+            this.emit("poll", this._pollData);
           }
         } catch (err: any) {
-          console.error('[TradeOfferManagerAdapter] Error in event listener:', err);
+          console.error(
+            "[TradeOfferManagerAdapter] Error in event listener:",
+            err,
+          );
         }
       });
 
-      stream.on('error', (err: any) => {
-        this.emit('error', err);
+      stream.on("error", (err: any) => {
+        this.emit("error", err);
         this._eventStream = null;
         // Re-establish stream after delay
         setTimeout(() => this._setupEventStream(), 5000);
       });
     } catch (err) {
-      this.emit('error', err);
+      this.emit("error", err);
     }
   }
 
   getOffers(
     filter: OfferFilter,
-    callback: (err: Error | null, sent?: TradeOffer[], received?: TradeOffer[]) => void
+    callback: (
+      err: Error | null,
+      sent?: TradeOffer[],
+      received?: TradeOffer[],
+    ) => void,
   ): void {
     this._getOffers(filter)
       .then(({ sent, received }) => callback(null, sent, received))
-      .catch(err => callback(err));
+      .catch((err) => callback(err));
   }
 
-  private async _getOffers(filter: OfferFilter): Promise<{ sent: TradeOffer[]; received: TradeOffer[] }> {
+  private async _getOffers(
+    filter: OfferFilter,
+  ): Promise<{ sent: TradeOffer[]; received: TradeOffer[] }> {
     const sent: TradeOffer[] = [];
     const received: TradeOffer[] = [];
 
@@ -337,61 +360,55 @@ export class TradeOfferManagerAdapter extends EventEmitter {
 
   getOffer(
     offerId: string,
-    callback: (err: Error | null, offer?: TradeOffer | null) => void
+    callback: (err: Error | null, offer?: TradeOffer | null) => void,
   ): void {
     const offer = this.offersCache.get(offerId) || null;
     if (offer) {
       callback(null, offer);
     } else {
-      callback(new Error('NoMatch'));
+      callback(new Error("NoMatch"));
     }
   }
 
   acceptOffer(
     offer: TradeOffer,
-    callback: (err: Error | null, status?: string) => void
+    callback: (err: Error | null, status?: string) => void,
   ): void {
     const offerId = offer.tradeofferid;
     this.client
-      .execAction(440, 'accept-offer', { offer_id: offerId })
-      .then(result => {
+      .execAction(440, "accept-offer", { offer_id: offerId })
+      .then((result) => {
         this._pollData.received[offerId] = ETradeOfferState.Accepted;
-        callback(null, 'accepted');
+        callback(null, "accepted");
       })
-      .catch(err => callback(err));
+      .catch((err) => callback(err));
   }
 
-  declineOffer(
-    offer: TradeOffer,
-    callback: (err: Error | null) => void
-  ): void {
+  declineOffer(offer: TradeOffer, callback: (err: Error | null) => void): void {
     const offerId = offer.tradeofferid;
     this.client
-      .execAction(440, 'decline-offer', { offer_id: offerId })
+      .execAction(440, "decline-offer", { offer_id: offerId })
       .then(() => {
         this._pollData.received[offerId] = ETradeOfferState.Declined;
         callback(null);
       })
-      .catch(err => callback(err));
+      .catch((err) => callback(err));
   }
 
-  cancelOffer(
-    offer: TradeOffer,
-    callback: (err: Error | null) => void
-  ): void {
+  cancelOffer(offer: TradeOffer, callback: (err: Error | null) => void): void {
     const offerId = offer.tradeofferid;
     this.client
-      .execAction(440, 'cancel-offer', { offer_id: offerId })
+      .execAction(440, "cancel-offer", { offer_id: offerId })
       .then(() => {
         this._pollData.sent[offerId] = ETradeOfferState.Cancelled;
         callback(null);
       })
-      .catch(err => callback(err));
+      .catch((err) => callback(err));
   }
 
   sendOffer(
     offer: TradeOffer,
-    callback: (err: Error | null, status?: string) => void
+    callback: (err: Error | null, status?: string) => void,
   ): void {
     const params: SendOfferParams = {
       partner_id: offer.partner,
@@ -401,10 +418,10 @@ export class TradeOfferManagerAdapter extends EventEmitter {
     };
 
     this.client
-      .execAction(440, 'send-offer', {
+      .execAction(440, "send-offer", {
         offer_params: JSON.stringify(params),
       })
-      .then(result => {
+      .then((result) => {
         const response = JSON.parse(result.details) as { tradeofferid: string };
         const newOffer: TradeOffer = {
           ...offer,
@@ -414,32 +431,32 @@ export class TradeOfferManagerAdapter extends EventEmitter {
         this.offersCache.set(response.tradeofferid, newOffer);
         this._pollData.sent[response.tradeofferid] =
           ETradeOfferState.CreatedNeedsConfirmation;
-        callback(null, 'sent');
+        callback(null, "sent");
       })
-      .catch(err => callback(err));
+      .catch((err) => callback(err));
   }
 
   counterOffer(
     offer: TradeOffer,
-    callback: (err: Error | null, status?: string) => void
+    callback: (err: Error | null, status?: string) => void,
   ): void {
     this.sendOffer(offer, callback);
   }
 
   async checkEscrow(offer: TradeOffer): Promise<boolean> {
-    const result = await this.client.execAction(440, 'check-escrow', {
+    const result = await this.client.execAction(440, "check-escrow", {
       offer: JSON.stringify({ tradeofferid: offer.tradeofferid }),
     });
-    return result.details === 'true';
+    return result.details === "true";
   }
 
   getPartnerInventory(
     partnerId: string,
-    callback: (err: Error | null, items?: TradeOfferItem[]) => void
+    callback: (err: Error | null, items?: TradeOfferItem[]) => void,
   ): void {
     this.client
-      .execAction(440, 'get-partner-inventory', { partner_id: partnerId })
-      .then(result => {
+      .execAction(440, "get-partner-inventory", { partner_id: partnerId })
+      .then((result) => {
         try {
           const items = JSON.parse(result.details) as TradeOfferItem[];
           callback(null, items);
@@ -447,7 +464,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
           callback(null, []);
         }
       })
-      .catch(err => callback(err));
+      .catch((err) => callback(err));
   }
 
   setItemInTrade(assetid: string): void {

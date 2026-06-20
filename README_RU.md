@@ -332,6 +332,34 @@ async function main() {
 main();
 ```
 
+## Пакеты-заглушки (Drop-in Subpackages)
+
+Для упрощения миграции существующих ботов (таких как `tf2autobot`), `node-gman` поставляется с набором пакетов-заглушек в директории `packages/`. Эти пакеты полностью эмулируют API оригинальных библиотек Node.js, перенаправляя вызовы в демон `g-mand` или выполняя их локально:
+
+* **`@node-gman/steam-totp`** — замена для `steam-totp` (генерация 2FA-кодов локально или через демон).
+* **`@node-gman/steam-user`** — замена для `steam-user` (подключение к Steam через g-mand).
+* **`@node-gman/steamcommunity`** — замена для `steamcommunity` (работа с сессиями и запросами).
+* **`@node-gman/tf2`** — замена для `@tf2autobot/tf2` (взаимодействие с координатором игры TF2).
+* **`@node-gman/tradeoffer-manager`** — замена для `@tf2autobot/tradeoffer-manager` (управление трейдами в реальном времени).
+* **`@node-gman/tf2-sku`** — замена для `@tf2autobot/tf2-sku` (парсинг и генерация SKU предметов).
+* **`@node-gman/tf2-currencies`** — замена для `@tf2autobot/tf2-currencies` (математика и форматирование валюты TF2).
+
+### Использование в существующих проектах
+
+Вы можете легко заменить оригинальные зависимости в вашем `package.json` с помощью псевдонимов npm (npm aliases):
+
+```json
+"dependencies": {
+  "steam-totp": "npm:@node-gman/steam-totp@^1.0.0",
+  "steam-user": "npm:@node-gman/steam-user@^1.0.0",
+  "@tf2autobot/tradeoffer-manager": "npm:@node-gman/tradeoffer-manager@^1.0.0",
+  "@tf2autobot/tf2": "npm:@node-gman/tf2@^1.0.0",
+  "@tf2autobot/steamcommunity": "npm:@node-gman/steamcommunity@^1.0.0",
+  "@tf2autobot/tf2-sku": "npm:@node-gman/tf2-sku@^1.0.0",
+  "@tf2autobot/tf2-currencies": "npm:@node-gman/tf2-currencies@^1.0.0"
+}
+```
+
 ## Сборка и Тесты
 
 Библиотека использует статическую генерацию типов TypeScript из файлов описания protobuf.

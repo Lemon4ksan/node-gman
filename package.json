@@ -12,7 +12,9 @@
     "build": "npm run prebuild && tsc",
     "cli": "node dist/cli.js",
     "cli:dev": "ts-node src/cli.ts",
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint \"src/**/*.ts\" \"packages/*/src/**/*.ts\""
+
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.10.8",
@@ -22,6 +24,9 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^20.12.12",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/parser": "^8.61.1",
+    "eslint": "^10.5.0",
     "jest": "^30.4.2",
     "ts-jest": "^29.4.11",
     "ts-node": "^10.9.2",
@@ -34,6 +39,6 @@
     "grpc",
     "binding"
   ],
-  "author": "",
+  "author": "Lemon4ksan",
   "license": "BSD-3-Clause"
 }

@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
-import SteamID from 'steamid';
-import { GManClient } from 'node-gman';
+import { EventEmitter } from "events";
+import SteamID from "steamid";
+import { GManClient } from "node-gman";
 
 export default class SteamCommunity extends EventEmitter {
   public steamID: SteamID | null = null;
@@ -17,7 +17,9 @@ export default class SteamCommunity extends EventEmitter {
     }
   }
 
-  loggedIn(callback: (err: any, loggedIn?: boolean, familyView?: boolean) => void): void {
+  loggedIn(
+    callback: (err: any, loggedIn?: boolean, familyView?: boolean) => void,
+  ): void {
     this.client
       .getStatus()
       .then((status) => {
@@ -29,21 +31,25 @@ export default class SteamCommunity extends EventEmitter {
   }
 
   getSessionID(): string {
-    return 'dummy_session_id';
+    return "dummy_session_id";
   }
 
   getWebApiKey(callback: (err?: Error, key?: string) => void): void {
-    callback(new Error('Not supported via g-mand'));
+    callback(new Error("Not supported via g-mand"));
   }
 
   createWebApiKey(
     _options: { domain: string; identitySecret?: string; requestID?: string },
     callback: (
       err?: Error,
-      result?: { confirmationRequired: boolean; apiKey: string; finalizeOptions: Record<string, any> }
-    ) => void
+      result?: {
+        confirmationRequired: boolean;
+        apiKey: string;
+        finalizeOptions: Record<string, any>;
+      },
+    ) => void,
   ): void {
-    callback(new Error('Not supported via g-mand'));
+    callback(new Error("Not supported via g-mand"));
   }
 
   setCookies(_cookies: string[]): void {}
@@ -60,7 +66,7 @@ export default class SteamCommunity extends EventEmitter {
       featuredBadge?: number;
       primaryGroup?: SteamID | string;
     },
-    callback?: (err?: Error) => void
+    callback?: (err?: Error) => void,
   ): void {
     if (callback) callback();
   }
@@ -75,12 +81,15 @@ export default class SteamCommunity extends EventEmitter {
       playTime?: boolean;
       friendsList?: number;
     },
-    callback?: (err?: Error) => void
+    callback?: (err?: Error) => void,
   ): void {
     if (callback) callback();
   }
 
-  uploadAvatar(_image: Buffer | string, callback?: (err?: Error, url?: string) => void): void {
+  uploadAvatar(
+    _image: Buffer | string,
+    callback?: (err?: Error, url?: string) => void,
+  ): void {
     if (callback) callback();
   }
 
@@ -88,17 +97,24 @@ export default class SteamCommunity extends EventEmitter {
     if (callback) callback();
   }
 
-  inviteUserToGroup(_userID: SteamID | string, _groupID: SteamID | string, callback?: (err?: Error) => void): void {
+  inviteUserToGroup(
+    _userID: SteamID | string,
+    _groupID: SteamID | string,
+    callback?: (err?: Error) => void,
+  ): void {
     if (callback) callback();
   }
 
-  getSteamGroup(_id: SteamID | string, callback: (err?: Error, group?: any) => void): void {
+  getSteamGroup(
+    _id: SteamID | string,
+    callback: (err?: Error, group?: any) => void,
+  ): void {
     callback(undefined, {
-      steamID: new SteamID('76561198000000000'),
-      name: 'Dummy Group',
-      url: '',
-      headline: '',
-      summary: '',
+      steamID: new SteamID("76561198000000000"),
+      name: "Dummy Group",
+      url: "",
+      headline: "",
+      summary: "",
       avatarHash: Buffer.alloc(0),
       members: 0,
       membersInChat: 0,
@@ -108,34 +124,45 @@ export default class SteamCommunity extends EventEmitter {
     });
   }
 
-  getTradeURL(callback: (err?: Error, url?: string, token?: string) => void): void {
-    callback(undefined, '', '');
+  getTradeURL(
+    callback: (err?: Error, url?: string, token?: string) => void,
+  ): void {
+    callback(undefined, "", "");
   }
 
-  getSteamUser(_id: SteamID | string, callback: (err?: Error, user?: any) => void): void {
+  getSteamUser(
+    _id: SteamID | string,
+    callback: (err?: Error, user?: any) => void,
+  ): void {
     callback(undefined, {
-      steamID: new SteamID('76561198000000000'),
-      name: 'Unknown',
-      onlineState: 'online',
-      stateMessage: '',
-      privacyState: 'public',
-      visibilityState: '3',
-      avatarHash: '',
-      vacBanned: '0',
-      tradeBanState: 'none',
-      isLimitedAccount: '0',
-      customURL: '',
+      steamID: new SteamID("76561198000000000"),
+      name: "Unknown",
+      onlineState: "online",
+      stateMessage: "",
+      privacyState: "public",
+      visibilityState: "3",
+      avatarHash: "",
+      vacBanned: "0",
+      tradeBanState: "none",
+      isLimitedAccount: "0",
+      customURL: "",
       groups: null,
       primaryGroup: null,
-      getAvatarURL: (_size: string) => '',
+      getAvatarURL: (_size: string) => "",
     });
   }
 
-  acceptConfirmationForObject(_identitySecret: string, _objectID: string, callback: (err?: Error) => void): void {
+  acceptConfirmationForObject(
+    _identitySecret: string,
+    _objectID: string,
+    callback: (err?: Error) => void,
+  ): void {
     callback();
   }
 
-  getFriendsList(callback: (err?: Error, friendlist?: Record<string, number>) => void): void {
+  getFriendsList(
+    callback: (err?: Error, friendlist?: Record<string, number>) => void,
+  ): void {
     callback(undefined, {});
   }
 }

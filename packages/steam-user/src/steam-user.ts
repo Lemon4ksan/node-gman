@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
-import SteamID from 'steamid';
-import { GManClient } from 'node-gman';
+import { EventEmitter } from "events";
+import SteamID from "steamid";
+import { GManClient } from "node-gman";
 
 export enum EResult {
   Invalid = 0,
@@ -92,7 +92,7 @@ export default class SteamUser extends EventEmitter {
       steamID: SteamID | string,
       message: string,
       options?: { chatEntryType?: number; containsBbCode?: boolean },
-      callback?: (err: Error, response?: any) => void
+      callback?: (err: Error, response?: any) => void,
     ) => void;
   };
 
@@ -108,13 +108,19 @@ export default class SteamUser extends EventEmitter {
         steamID: SteamID | string,
         message: string,
         _options?: { chatEntryType?: number; containsBbCode?: boolean },
-        callback?: (err: Error, response?: any) => void
+        callback?: (err: Error, response?: any) => void,
       ) => {
-        const id = typeof steamID === 'string' ? steamID : steamID.getSteamID64();
+        const id =
+          typeof steamID === "string" ? steamID : steamID.getSteamID64();
         this.client
-          .execAction(440, 'send-chat', { steam_id: id, message })
+          .execAction(440, "send-chat", { steam_id: id, message })
           .then(() => {
-            if (callback) callback(null as any, { modified_message: message, server_timestamp: new Date(), ordinal: 0 });
+            if (callback)
+              callback(null as any, {
+                modified_message: message,
+                server_timestamp: new Date(),
+                ordinal: 0,
+              });
           })
           .catch((err: Error) => {
             if (callback) callback(err);
@@ -133,12 +139,12 @@ export default class SteamUser extends EventEmitter {
         this._loggedOn = true;
 
         process.nextTick(() => {
-          this.emit('loggedOn');
-          this.emit('webSession', 'dummy_session_id', ['dummy_cookie']);
+          this.emit("loggedOn");
+          this.emit("webSession", "dummy_session_id", ["dummy_cookie"]);
         });
       }
     } catch (err) {
-      this.emit('error', err);
+      this.emit("error", err);
     }
   }
 
@@ -155,11 +161,11 @@ export default class SteamUser extends EventEmitter {
 
   logOff(): void {
     this._loggedOn = false;
-    this.emit('loggedOff');
+    this.emit("loggedOff");
   }
 
   webLogOn(): void {
-    this.emit('webSession', 'dummy_session_id', ['dummy_cookie']);
+    this.emit("webSession", "dummy_session_id", ["dummy_cookie"]);
   }
 
   setPersona(_state: number, _name?: string): void {
@@ -169,20 +175,24 @@ export default class SteamUser extends EventEmitter {
   gamesPlayed(apps: number | number[]): void {
     const appid = Array.isArray(apps) ? apps[0] : apps;
     if (appid === 440) {
-      this.client.playGame(440).catch((err: Error) => this.emit('error', err));
+      this.client.playGame(440).catch((err: Error) => this.emit("error", err));
     } else if (!appid || (Array.isArray(apps) && apps.length === 0)) {
-      this.client.exitGame().catch((err: Error) => this.emit('error', err));
+      this.client.exitGame().catch((err: Error) => this.emit("error", err));
     }
   }
 
   chatMessage(recipient: SteamID | string, message: string): void {
-    const id = typeof recipient === 'string' ? recipient : recipient.getSteamID64();
+    const id =
+      typeof recipient === "string" ? recipient : recipient.getSteamID64();
     this.client
-      .execAction(440, 'send-chat', { steam_id: id, message })
-      .catch((err: Error) => this.emit('error', err));
+      .execAction(440, "send-chat", { steam_id: id, message })
+      .catch((err: Error) => this.emit("error", err));
   }
 
-  addFriend(steamID: SteamID | string, callback?: (err?: Error, personaName?: string) => void): void {
+  addFriend(
+    steamID: SteamID | string,
+    callback?: (err?: Error, personaName?: string) => void,
+  ): void {
     if (callback) callback();
   }
 
@@ -194,11 +204,17 @@ export default class SteamUser extends EventEmitter {
     if (callback) callback();
   }
 
-  unblockUser(_steamID: SteamID | string, callback?: (err?: Error) => void): void {
+  unblockUser(
+    _steamID: SteamID | string,
+    callback?: (err?: Error) => void,
+  ): void {
     if (callback) callback();
   }
 
-  respondToGroupInvite(_groupSteamID: SteamID | string, _accept: boolean): void {
+  respondToGroupInvite(
+    _groupSteamID: SteamID | string,
+    _accept: boolean,
+  ): void {
     // No-op
   }
 }

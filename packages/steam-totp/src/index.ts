@@ -5,4 +5,4 @@ export {
   getConfirmationKey,
   time,
   getTimeOffset,
-} from 'node-gman';
+} from "node-gman";

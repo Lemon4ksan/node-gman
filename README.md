@@ -331,6 +331,34 @@ async function main() {
 main();
 ```
 
+## Drop-in Subpackages
+
+To simplify the migration of existing bots (such as `tf2autobot`), `node-gman` includes a set of drop-in subpackage replacements in the `packages/` directory. These packages fully emulate the API of their original Node.js counterparts, routing actions to the `g-mand` daemon or resolving them locally:
+
+* **`@node-gman/steam-totp`** — replacement for `steam-totp` (generates 2FA codes locally or via the daemon).
+* **`@node-gman/steam-user`** — replacement for `steam-user` (Steam connection via g-mand).
+* **`@node-gman/steamcommunity`** — replacement for `steamcommunity` (community web sessions).
+* **`@node-gman/tf2`** — replacement for `@tf2autobot/tf2` (TF2 Game Coordinator interaction).
+* **`@node-gman/tradeoffer-manager`** — replacement for `@tf2autobot/tradeoffer-manager` (real-time trade offers).
+* **`@node-gman/tf2-sku`** — replacement for `@tf2autobot/tf2-sku` (item SKU parsing and generation).
+* **`@node-gman/tf2-currencies`** — replacement for `@tf2autobot/tf2-currencies` (TF2 currency math and formatting).
+
+### Using in Existing Projects
+
+You can drop these replacements into your existing project's `package.json` using npm aliases:
+
+```json
+"dependencies": {
+  "steam-totp": "npm:@node-gman/steam-totp@^1.0.0",
+  "steam-user": "npm:@node-gman/steam-user@^1.0.0",
+  "@tf2autobot/tradeoffer-manager": "npm:@node-gman/tradeoffer-manager@^1.0.0",
+  "@tf2autobot/tf2": "npm:@node-gman/tf2@^1.0.0",
+  "@tf2autobot/steamcommunity": "npm:@node-gman/steamcommunity@^1.0.0",
+  "@tf2autobot/tf2-sku": "npm:@node-gman/tf2-sku@^1.0.0",
+  "@tf2autobot/tf2-currencies": "npm:@node-gman/tf2-currencies@^1.0.0"
+}
+```
+
 ## Build & Tests
 
 The library uses static type generation from protobuf files.

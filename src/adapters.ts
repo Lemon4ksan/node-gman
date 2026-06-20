@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
-import { GManClient } from './client';
-import { StreamEventsResponse } from './types';
+import { EventEmitter } from "events";
+import { GManClient } from "./client";
+import { StreamEventsResponse } from "./types";
 
 export class SteamUserAdapter extends EventEmitter {
   public steamID: any = null;
@@ -20,21 +20,22 @@ export class SteamUserAdapter extends EventEmitter {
           getSteamID64: () => status.steam_id,
           toString: () => status.steam_id,
         };
-        const sessionID = Math.random().toString(16).substring(2, 10) +
-                         Math.random().toString(16).substring(2, 10) +
-                         Math.random().toString(16).substring(2, 10) +
-                         Math.random().toString(16).substring(2, 10);
+        const sessionID =
+          Math.random().toString(16).substring(2, 10) +
+          Math.random().toString(16).substring(2, 10) +
+          Math.random().toString(16).substring(2, 10) +
+          Math.random().toString(16).substring(2, 10);
         const cookies = [
           `sessionid=${sessionID}`,
-          `steamLoginSecure=${status.steam_id || '76561198000000000'}%7C%7C${Math.random().toString(16).substring(2, 10)}`
+          `steamLoginSecure=${status.steam_id || "76561198000000000"}%7C%7C${Math.random().toString(16).substring(2, 10)}`,
         ];
         process.nextTick(() => {
-          this.emit('loggedOn', this.steamID);
-          this.emit('webSession', sessionID, cookies);
+          this.emit("loggedOn", this.steamID);
+          this.emit("webSession", sessionID, cookies);
         });
       }
     } catch (err) {
-      this.emit('error', err);
+      this.emit("error", err);
     }
   }
 
@@ -50,9 +51,9 @@ export class SteamUserAdapter extends EventEmitter {
   gamesPlayed(apps: any) {
     const appid = Array.isArray(apps) ? apps[0] : apps;
     if (appid === 440) {
-      this.client.playGame(440).catch(err => this.emit('error', err));
+      this.client.playGame(440).catch((err) => this.emit("error", err));
     } else if (!appid || (Array.isArray(apps) && apps.length === 0)) {
-      this.client.exitGame().catch(err => this.emit('error', err));
+      this.client.exitGame().catch((err) => this.emit("error", err));
     }
   }
 
@@ -62,20 +63,25 @@ export class SteamUserAdapter extends EventEmitter {
 
   chatMessage(steamID: string, message: string) {
     // No-op (handled inside high-level chat systems or logging)
-    console.log(`[SteamUserAdapter] Mock chatMessage to ${steamID}: ${message}`);
+    console.log(
+      `[SteamUserAdapter] Mock chatMessage to ${steamID}: ${message}`,
+    );
   }
 
   webLogOn() {
-    const sessionID = Math.random().toString(16).substring(2, 10) +
-                     Math.random().toString(16).substring(2, 10) +
-                     Math.random().toString(16).substring(2, 10) +
-                     Math.random().toString(16).substring(2, 10);
-    const steamIDStr = this.steamID ? this.steamID.toString() : '76561198000000000';
+    const sessionID =
+      Math.random().toString(16).substring(2, 10) +
+      Math.random().toString(16).substring(2, 10) +
+      Math.random().toString(16).substring(2, 10) +
+      Math.random().toString(16).substring(2, 10);
+    const steamIDStr = this.steamID
+      ? this.steamID.toString()
+      : "76561198000000000";
     const cookies = [
       `sessionid=${sessionID}`,
-      `steamLoginSecure=${steamIDStr}%7C%7C${Math.random().toString(16).substring(2, 10)}`
+      `steamLoginSecure=${steamIDStr}%7C%7C${Math.random().toString(16).substring(2, 10)}`,
     ];
-    this.emit('webSession', sessionID, cookies);
+    this.emit("webSession", sessionID, cookies);
   }
 }
 
@@ -91,49 +97,53 @@ export class TeamFortress2Adapter extends EventEmitter {
 
   private init() {
     const stream = this.client.streamEvents();
-    
-    stream.on('data', (data: StreamEventsResponse) => {
+
+    stream.on("data", (data: StreamEventsResponse) => {
       let evType = data.event_type;
-      const idx = evType.lastIndexOf('.');
+      const idx = evType.lastIndexOf(".");
       if (idx !== -1) {
         evType = evType.substring(idx + 1);
       }
-      if (evType.startsWith('*')) {
+      if (evType.startsWith("*")) {
         evType = evType.substring(1);
       }
-      
+
       try {
         const payload = JSON.parse(data.payload_json);
-        
+
         switch (evType) {
-          case 'ConnectedEvent':
+          case "ConnectedEvent":
             this.haveGCSession = true;
-            this.emit('connectedToGC');
+            this.emit("connectedToGC");
             break;
-          case 'DisconnectedEvent':
+          case "DisconnectedEvent":
             this.haveGCSession = false;
-            this.emit('disconnectedFromGC');
+            this.emit("disconnectedFromGC");
             break;
-          case 'ItemAcquiredEvent':
+          case "ItemAcquiredEvent":
             const item = payload.item || {};
-            this.emit('itemAcquired', {
+            this.emit("itemAcquired", {
               id: item.asset_id || item.id,
               def_index: item.def_index,
               quality: item.quality,
               quantity: item.quantity || 1,
               is_tradable: item.is_tradable,
               is_craftable: item.is_craftable,
-              attribute: Object.entries(item.attributes || {}).map(([def, val]) => ({
-                def_index: Number(def),
-                value: val,
-              })),
+              attribute: Object.entries(item.attributes || {}).map(
+                ([def, val]) => ({
+                  def_index: Number(def),
+                  value: val,
+                }),
+              ),
             });
             break;
-          case 'ItemRemovedEvent':
-            this.emit('itemRemoved', { id: payload.asset_id });
+          case "ItemRemovedEvent":
+            this.emit("itemRemoved", { id: payload.asset_id });
             break;
-          case 'ItemUpdatedEvent':
-            this.emit('itemChanged', { id: (payload.item && payload.item.asset_id) || payload.asset_id });
+          case "ItemUpdatedEvent":
+            this.emit("itemChanged", {
+              id: (payload.item && payload.item.asset_id) || payload.asset_id,
+            });
             break;
         }
       } catch (err) {
@@ -141,42 +151,55 @@ export class TeamFortress2Adapter extends EventEmitter {
       }
     });
 
-    stream.on('error', (err: any) => {
-      this.emit('error', err);
+    stream.on("error", (err: any) => {
+      this.emit("error", err);
     });
 
     // Fetch initial GC connection state
-    this.client.getStatus().then(status => {
-      if (status.connected && status.current_appid === 440) {
-        this.haveGCSession = true;
-        this.emit('connectedToGC');
-      }
-    }).catch(() => {});
+    this.client
+      .getStatus()
+      .then((status) => {
+        if (status.connected && status.current_appid === 440) {
+          this.haveGCSession = true;
+          this.emit("connectedToGC");
+        }
+      })
+      .catch(() => {});
   }
 
   craft(assetids: string[], recipe: number = -1) {
-    this.client.execAction(440, 'craft', {
-      recipe: recipe.toString(),
-      items: JSON.stringify(assetids.map(id => Number(id))),
-    }).catch(err => this.emit('error', err));
+    this.client
+      .execAction(440, "craft", {
+        recipe: recipe.toString(),
+        items: JSON.stringify(assetids.map((id) => Number(id))),
+      })
+      .catch((err) => this.emit("error", err));
   }
 
   useItem(assetid: string) {
-    this.client.execAction(440, 'use-item', { item_id: assetid }).catch(err => this.emit('error', err));
+    this.client
+      .execAction(440, "use-item", { item_id: assetid })
+      .catch((err) => this.emit("error", err));
   }
 
   deleteItem(assetid: string) {
-    this.client.execAction(440, 'delete-item', { item_id: assetid }).catch(err => this.emit('error', err));
+    this.client
+      .execAction(440, "delete-item", { item_id: assetid })
+      .catch((err) => this.emit("error", err));
   }
 
   removeItemAttribute(assetid: string, attribute: number) {
-    console.warn(`[TeamFortress2Adapter] removeItemAttribute not fully supported on daemon: ${assetid}, attribute: ${attribute}`);
+    console.warn(
+      `[TeamFortress2Adapter] removeItemAttribute not fully supported on daemon: ${assetid}, attribute: ${attribute}`,
+    );
   }
 
   sortBackpack(type: number) {
-    this.client.execAction(440, 'sort-backpack', {
-      type: 'gc',
-      sort_type: type.toString(),
-    }).catch(err => this.emit('error', err));
+    this.client
+      .execAction(440, "sort-backpack", {
+        type: "gc",
+        sort_type: type.toString(),
+      })
+      .catch((err) => this.emit("error", err));
   }
 }

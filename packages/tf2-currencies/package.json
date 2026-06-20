@@ -1,0 +1,26 @@
+{
+  "name": "@node-gman/tf2-currencies",
+  "version": "1.0.0",
+  "description": "Drop-in replacement for @tf2autobot/tf2-currencies that routes through node-gman Currencies implementation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "node-gman": "file:../../"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "@tf2autobot/tf2-currencies": "*"
+  },
+  "peerDependenciesMeta": {
+    "@tf2autobot/tf2-currencies": {
+      "optional": true
+    }
+  },
+  "license": "BSD-3-Clause"
+}

@@ -1,6 +1,6 @@
-import { EventEmitter } from 'events';
-import SteamID from 'steamid';
-import { GManClient } from 'node-gman';
+import { EventEmitter } from "events";
+import SteamID from "steamid";
+import { GManClient } from "node-gman";
 
 class TF2Class extends EventEmitter {
   public haveGCSession: boolean = false;
@@ -21,13 +21,13 @@ class TF2Class extends EventEmitter {
   private init() {
     const stream = this.client.streamEvents();
 
-    stream.on('data', (data: any) => {
+    stream.on("data", (data: any) => {
       let evType = data.event_type;
-      const idx = evType.lastIndexOf('.');
+      const idx = evType.lastIndexOf(".");
       if (idx !== -1) {
         evType = evType.substring(idx + 1);
       }
-      if (evType.startsWith('*')) {
+      if (evType.startsWith("*")) {
         evType = evType.substring(1);
       }
 
@@ -35,22 +35,22 @@ class TF2Class extends EventEmitter {
         const payload = JSON.parse(data.payload_json);
 
         switch (evType) {
-          case 'ConnectedEvent':
+          case "ConnectedEvent":
             this.haveGCSession = true;
-            this.emit('connectedToGC', '7898640');
+            this.emit("connectedToGC", "7898640");
             break;
-          case 'DisconnectedEvent':
+          case "DisconnectedEvent":
             this.haveGCSession = false;
-            this.emit('disconnectedToGC', 'unknown');
+            this.emit("disconnectedToGC", "unknown");
             break;
-          case 'ItemAcquiredEvent':
-            this.emit('itemAcquired', payload.item || {});
+          case "ItemAcquiredEvent":
+            this.emit("itemAcquired", payload.item || {});
             break;
-          case 'ItemRemovedEvent':
-            this.emit('itemRemoved', { id: payload.asset_id });
+          case "ItemRemovedEvent":
+            this.emit("itemRemoved", { id: payload.asset_id });
             break;
-          case 'ItemUpdatedEvent':
-            this.emit('itemChanged', { id: payload.asset_id });
+          case "ItemUpdatedEvent":
+            this.emit("itemChanged", { id: payload.asset_id });
             break;
         }
       } catch (err) {
@@ -58,27 +58,30 @@ class TF2Class extends EventEmitter {
       }
     });
 
-    stream.on('error', (err: any) => {
-      this.emit('error', err);
+    stream.on("error", (err: any) => {
+      this.emit("error", err);
     });
 
-    this.client.getStatus().then((status) => {
-      if (status.connected && status.current_appid === 440) {
-        this.haveGCSession = true;
-        this.emit('connectedToGC', '7898640');
-      }
-    }).catch(() => {});
+    this.client
+      .getStatus()
+      .then((status) => {
+        if (status.connected && status.current_appid === 440) {
+          this.haveGCSession = true;
+          this.emit("connectedToGC", "7898640");
+        }
+      })
+      .catch(() => {});
   }
 
   setLang(_localizationFile: string): void {}
 
   craft(items: string[], recipe?: number): void {
     this.client
-      .execAction(440, 'craft', {
+      .execAction(440, "craft", {
         recipe: (recipe ?? -1).toString(),
         items: JSON.stringify(items.map(Number)),
       })
-      .catch((err) => this.emit('error', err));
+      .catch((err) => this.emit("error", err));
   }
 
   trade(_steamID: SteamID): void {}
@@ -93,8 +96,8 @@ class TF2Class extends EventEmitter {
 
   deleteItem(item: string): void {
     this.client
-      .execAction(440, 'delete-item', { item_id: item })
-      .catch((err) => this.emit('error', err));
+      .execAction(440, "delete-item", { item_id: item })
+      .catch((err) => this.emit("error", err));
   }
 
   wrapItem(_wrapID: string, _itemID: string): void {}
@@ -105,8 +108,8 @@ class TF2Class extends EventEmitter {
 
   useItem(item: string): void {
     this.client
-      .execAction(440, 'use-item', { item_id: item })
-      .catch((err) => this.emit('error', err));
+      .execAction(440, "use-item", { item_id: item })
+      .catch((err) => this.emit("error", err));
   }
 
   tradeUP(_items: string[]): void {}
@@ -115,15 +118,18 @@ class TF2Class extends EventEmitter {
 
   applyStrangePart(_item: string, _strangPartItemID: string): void {}
 
-  applyStrangifierOrUnusualifier(_item: string, _strangifierOrUnusualifierID: string): void {}
+  applyStrangifierOrUnusualifier(
+    _item: string,
+    _strangifierOrUnusualifierID: string,
+  ): void {}
 
   sortBackpack(sortType: number): void {
     this.client
-      .execAction(440, 'sort-backpack', {
-        type: 'gc',
+      .execAction(440, "sort-backpack", {
+        type: "gc",
         sort_type: sortType.toString(),
       })
-      .catch((err) => this.emit('error', err));
+      .catch((err) => this.emit("error", err));
   }
 
   sendProfessorSpeks(_steamID: SteamID): void {}
@@ -136,8 +142,11 @@ class TF2Class extends EventEmitter {
 
   openCrate(_keyID: string, _crateID: string): void {}
 
-  requestWarStats(_warID?: number, callback?: (err: Error, data: any) => void): void {
-    if (callback) callback(new Error('Not supported'), {});
+  requestWarStats(
+    _warID?: number,
+    callback?: (err: Error, data: any) => void,
+  ): void {
+    if (callback) callback(new Error("Not supported"), {});
   }
 }
 
