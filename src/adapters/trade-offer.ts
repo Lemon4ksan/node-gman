@@ -174,7 +174,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
       return [];
     }
     try {
-      const parsed = JSON.parse(details);
+      const parsed = parseSafeJson(details);
       if (Array.isArray(parsed)) {
         return parsed.map((o: any) => this.normalizeOffer(o));
       }
@@ -254,7 +254,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
         }
 
         try {
-          const payload = JSON.parse(data.payload_json);
+          const payload = parseSafeJson(data.payload_json);
           if (evType === "NewOfferEvent" && payload.Offer) {
             const offer = this.normalizeOffer(payload.Offer);
             const id = offer.tradeofferid;
@@ -422,7 +422,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
         offer_params: JSON.stringify(params),
       })
       .then((result) => {
-        const response = JSON.parse(result.details) as { tradeofferid: string };
+        const response = parseSafeJson(result.details) as { tradeofferid: string };
         const newOffer: TradeOffer = {
           ...offer,
           tradeofferid: response.tradeofferid,
@@ -458,7 +458,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
       .execAction(440, "get-partner-inventory", { partner_id: partnerId })
       .then((result) => {
         try {
-          const items = JSON.parse(result.details) as TradeOfferItem[];
+          const items = parseSafeJson(result.details) as TradeOfferItem[];
           callback(null, items);
         } catch {
           callback(null, []);
@@ -479,3 +479,10 @@ export class TradeOfferManagerAdapter extends EventEmitter {
     return false;
   }
 }
+
+function parseSafeJson(json: string): any {
+  if (!json) return null;
+  const safe = json.replace(/:\s*(\d{15,})/g, ':"$1"');
+  return JSON.parse(safe);
+}
+

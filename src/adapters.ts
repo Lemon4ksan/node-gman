@@ -33,6 +33,35 @@ export class SteamUserAdapter extends EventEmitter {
           this.emit("loggedOn", this.steamID);
           this.emit("webSession", sessionID, cookies);
         });
+
+        const stream = this.client.streamEvents();
+        stream.on("data", (data: StreamEventsResponse) => {
+          let evType = data.event_type;
+          const idx = evType.lastIndexOf(".");
+          if (idx !== -1) {
+            evType = evType.substring(idx + 1);
+          }
+          if (evType.startsWith("*")) {
+            evType = evType.substring(1);
+          }
+
+          if (evType === "MessageEvent") {
+            try {
+              const safeJson = data.payload_json.replace(/:\s*(\d{15,})/g, ':"$1"');
+              const payload = JSON.parse(safeJson);
+              if (payload.SenderID && payload.Message) {
+                const SteamID = require("steamid");
+                const senderID = new SteamID(payload.SenderID.toString());
+                this.emit("friendMessage", senderID, payload.Message);
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+        });
+        stream.on("error", (err: any) => {
+          this.emit("error", err);
+        });
       }
     } catch (err) {
       this.emit("error", err);
