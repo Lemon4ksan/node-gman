@@ -134,11 +134,11 @@ const tf2 = new TeamFortress2Adapter(client);
 
 ### TradeOfferManagerAdapter
 
-Adapter for managing trade offers.
+Adapter for managing trade offers. Uses real-time gRPC event streaming (`StreamEvents` from the daemon) as the primary transport for instant updates, and falls back to polling for maximum reliability.
 
 ```typescript
 const tradeManager = new TradeOfferManagerAdapter(client, {
-  pollInterval: 30000, // polling interval in ms
+  pollInterval: 30000, // polling interval in ms (fallback backup)
 });
 ```
 
@@ -147,23 +147,29 @@ const tradeManager = new TradeOfferManagerAdapter(client, {
 - `pollInterval` — polling interval
 
 **Events:**
-- `newOffer` — new incoming offer
-- `offerChanged` — offer status changed
+- `newOffer` — new incoming offer (emitted in real-time)
+- `offerChanged` — offer status changed (emitted in real-time)
 - `poll` — polling data updated
 - `error` — error occurred
 
 **Methods:**
-- `startPolling()` — start polling
-- `stopPolling()` — stop polling
+- `startPolling()` — start real-time event streaming subscription and backup polling interval
+- `stopPolling()` — unsubscribe from event streaming and stop polling interval
 - `client.execAction(...)` — direct g-mand call
 
 ### SteamCommunityAdapter
 
-Adapter for Steam Community (emulates `@tf2autobot/steamcommunity`).
+Adapter for Steam Community (emulates `@tf2autobot/steamcommunity`). Supports web session cookie tracking and synchronization.
 
 ```typescript
 const community = new SteamCommunityAdapter(client, { steamID: '...' });
 ```
+
+**Methods:**
+- `setCookie(cookie)` — set/track custom cookie string
+- `setCookies(cookies)` — set/track custom cookies array
+- `getWebSession(callback)` — retrieve active web session ID and cookies
+- `getWebSessionSync()` — synchronously retrieve active web session ID and cookies
 
 ## Types
 
@@ -323,6 +329,18 @@ async function main() {
 }
 
 main();
+```
+
+## Build & Tests
+
+The library uses static type generation from protobuf files.
+
+```bash
+# Generate types and compile TypeScript to dist/
+npm run build
+
+# Run Jest unit test suite
+npm run test
 ```
 
 ## License

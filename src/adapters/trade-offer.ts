@@ -45,6 +45,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
   private _pollInterval: NodeJS.Timeout | null = null;
   private _pollIntervalMs: number;
   private offersCache: Map<string, TradeOffer> = new Map();
+  private _eventStream: any = null;
 
   constructor(client: GManClient, options: TradeOfferManagerOptions = {}) {
     super();
@@ -73,6 +74,7 @@ export class TradeOfferManagerAdapter extends EventEmitter {
   }
 
   startPolling(): void {
+    this._setupEventStream();
     if (this._pollInterval) return;
     this._pollInterval = setInterval(() => this._poll(), this._pollIntervalMs);
     this._poll();
@@ -82,6 +84,12 @@ export class TradeOfferManagerAdapter extends EventEmitter {
     if (this._pollInterval) {
       clearInterval(this._pollInterval);
       this._pollInterval = null;
+    }
+    if (this._eventStream) {
+      if (typeof this._eventStream.cancel === 'function') {
+        this._eventStream.cancel();
+      }
+      this._eventStream = null;
     }
   }
 
@@ -160,11 +168,132 @@ export class TradeOfferManagerAdapter extends EventEmitter {
     try {
       const parsed = JSON.parse(details);
       if (Array.isArray(parsed)) {
-        return parsed;
+        return parsed.map((o: any) => this.normalizeOffer(o));
       }
       return [];
     } catch {
       return [];
+    }
+  }
+
+  private normalizeOffer(rawOffer: any): TradeOffer {
+    if (!rawOffer) return rawOffer;
+    const offer: any = { ...rawOffer };
+
+    if (!offer.tradeofferid && offer.trade_offer_id) {
+      offer.tradeofferid = offer.trade_offer_id.toString();
+    } else if (offer.tradeofferid) {
+      offer.tradeofferid = offer.tradeofferid.toString();
+    } else if (offer.ID) {
+      offer.tradeofferid = offer.ID.toString();
+    }
+
+    if (!offer.partner && offer.accountid_other) {
+      offer.partner = offer.accountid_other.toString();
+    } else if (!offer.partner && offer.OtherSteamID) {
+      offer.partner = offer.OtherSteamID.toString();
+    }
+
+    if (offer.trade_offer_state === undefined && offer.State !== undefined) {
+      offer.trade_offer_state = offer.State;
+    }
+
+    if (!offer.items_to_give && offer.ItemsToGive) {
+      offer.items_to_give = offer.ItemsToGive.map((item: any) => this.normalizeItem(item));
+    }
+    if (!offer.items_to_receive && offer.ItemsToReceive) {
+      offer.items_to_receive = offer.ItemsToReceive.map((item: any) => this.normalizeItem(item));
+    }
+
+    return offer as TradeOffer;
+  }
+
+  private normalizeItem(rawItem: any): any {
+    if (!rawItem) return rawItem;
+    const item: any = { ...rawItem };
+    if (!item.assetid && item.AssetID) {
+      item.assetid = item.AssetID.toString();
+    } else if (item.assetid) {
+      item.assetid = item.assetid.toString();
+    }
+    if (!item.appid && item.AppID) {
+      item.appid = item.AppID;
+    }
+    if (!item.contextid && item.ContextID) {
+      item.contextid = item.ContextID.toString();
+    }
+    return item;
+  }
+
+  private _setupEventStream(): void {
+    if (this._eventStream) return;
+    try {
+      const stream = this.client.streamEvents();
+      this._eventStream = stream;
+
+      stream.on('data', (data: any) => {
+        let evType = data.event_type;
+        const idx = evType.lastIndexOf('.');
+        if (idx !== -1) {
+          evType = evType.substring(idx + 1);
+        }
+        if (evType.startsWith('*')) {
+          evType = evType.substring(1);
+        }
+
+        try {
+          const payload = JSON.parse(data.payload_json);
+          if (evType === 'NewOfferEvent' && payload.Offer) {
+            const offer = this.normalizeOffer(payload.Offer);
+            const id = offer.tradeofferid;
+
+            this.offersCache.set(id, offer);
+            const prevState = this._pollData.received[id];
+            const newState = offer.trade_offer_state;
+
+            this._pollData.received[id] = newState;
+            this._pollData.offerData[id] = offer.data || {};
+
+            if (prevState === undefined) {
+              this.emit('newOffer', offer);
+            } else if (prevState !== newState) {
+              this.emit('offerChanged', { offer, oldState: prevState });
+            }
+            this.emit('poll', this._pollData);
+          } else if (evType === 'OfferChangedEvent' && payload.Offer) {
+            const offer = this.normalizeOffer(payload.Offer);
+            const id = offer.tradeofferid;
+
+            this.offersCache.set(id, offer);
+            const isSent = offer.is_our_offer;
+            const prevState = isSent ? this._pollData.sent[id] : this._pollData.received[id];
+            const newState = offer.trade_offer_state;
+
+            if (isSent) {
+              this._pollData.sent[id] = newState;
+            } else {
+              this._pollData.received[id] = newState;
+            }
+            this._pollData.offerData[id] = offer.data || {};
+
+            if (prevState !== newState) {
+              this.emit('offerChanged', { offer, oldState: prevState });
+            }
+            this.emit('poll', this._pollData);
+          }
+        } catch (err: any) {
+          console.error('[TradeOfferManagerAdapter] Error in event listener:', err);
+        }
+      });
+
+      stream.on('error', (err: any) => {
+        this.emit('error', err);
+        this._eventStream = null;
+        // Re-establish stream after delay
+        setTimeout(() => this._setupEventStream(), 5000);
+      });
+    } catch (err) {
+      this.emit('error', err);
     }
   }
 

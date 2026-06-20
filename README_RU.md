@@ -134,11 +134,11 @@ const tf2 = new TeamFortress2Adapter(client);
 
 ### TradeOfferManagerAdapter
 
-Адаптер для управления торговыми предложениями.
+Адаптер для управления торговыми предложениями. Использует событийный стриминг по gRPC (`StreamEvents` из демона) в качестве основного транспорта для мгновенных обновлений в реальном времени с автоматическим переходом на периодический опрос в качестве резервного механизма.
 
 ```typescript
 const tradeManager = new TradeOfferManagerAdapter(client, {
-  pollInterval: 30000, // интервал опроса в мс
+  pollInterval: 30000, // интервал резервного опроса в мс
 });
 ```
 
@@ -147,23 +147,29 @@ const tradeManager = new TradeOfferManagerAdapter(client, {
 - `pollInterval` — интервал опроса
 
 **События:**
-- `newOffer` — новое входящее предложение
-- `offerChanged` — изменение статуса предложения
+- `newOffer` — новое входящее предложение (эмитится в реальном времени)
+- `offerChanged` — изменение статуса предложения (эмитится в реальном времени)
 - `poll` — данные опроса обновлены
 - `error` — ошибка
 
 **Методы:**
-- `startPolling()` — начать опрос
-- `stopPolling()` — остановить опрос
+- `startPolling()` — подписаться на gRPC-стрим событий реального времени и запустить фоновый таймер резервного опроса
+- `stopPolling()` — отписаться от стрима событий и остановить фоновый таймер опроса
 - `client.execAction(...)` — прямой вызов g-mand
 
 ### SteamCommunityAdapter
 
-Адаптер для Steam Community (эмулирует `@tf2autobot/steamcommunity`).
+Адаптер для Steam Community (эмулирует `@tf2autobot/steamcommunity`). Поддерживает отслеживание и синхронизацию cookie-файлов веб-сессии.
 
 ```typescript
 const community = new SteamCommunityAdapter(client, { steamID: '...' });
 ```
+
+**Методы:**
+- `setCookie(cookie)` — установить/отслеживать строку cookie
+- `setCookies(cookies)` — установить/отслеживать массив cookies
+- `getWebSession(callback)` — получить ID активной веб-сессии и массив cookies
+- `getWebSessionSync()` — синхронно получить ID активной веб-сессии и массив cookies
 
 ## Типы
 
@@ -324,6 +330,18 @@ async function main() {
 }
 
 main();
+```
+
+## Сборка и Тесты
+
+Библиотека использует статическую генерацию типов TypeScript из файлов описания protobuf.
+
+```bash
+# Сгенерировать типы и скомпилировать TypeScript код в dist/
+npm run build
+
+# Запустить тестовый набор Jest
+npm run test
 ```
 
 ## Лицензия

@@ -8,7 +8,7 @@
     "gmanctl-node": "dist/cli.js"
   },
   "scripts": {
-    "prebuild": "node -e \"const fs = require('fs'); if (!fs.existsSync('proto')) fs.mkdirSync('proto'); fs.copyFileSync('../proto/daemon.proto', 'proto/daemon.proto');\" && npx proto-loader-gen-types --keepCase --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=src/proto/ proto/daemon.proto",
+    "prebuild": "node -e \"const fs = require('fs'); if (fs.existsSync('../proto/daemon.proto')) { if (!fs.existsSync('proto')) fs.mkdirSync('proto'); fs.copyFileSync('../proto/daemon.proto', 'proto/daemon.proto'); }\" && npx proto-loader-gen-types --keepCase --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=src/proto/ proto/daemon.proto",
     "build": "npm run prebuild && tsc",
     "cli": "node dist/cli.js",
     "cli:dev": "ts-node src/cli.ts",

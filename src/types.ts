@@ -144,6 +144,7 @@ export interface TradeOffer {
   expires?: number;
   trade_hold_reason?: number;
   confirmation_method?: number;
+  is_our_offer?: boolean;
   data?: Record<string, unknown>;
 }
 
