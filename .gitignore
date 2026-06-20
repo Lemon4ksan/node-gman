@@ -43,6 +43,9 @@ typings/
 # Optional npm cache directory
 .npm
 
+# Private npm auth token
+.npmrc
+
 # Optional eslint cache
 .eslintcache
 
