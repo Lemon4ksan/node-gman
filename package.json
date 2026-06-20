@@ -13,7 +13,7 @@
     "cli": "node dist/cli.js",
     "cli:dev": "ts-node src/cli.ts",
     "test": "jest",
-    "lint": "eslint \"src/**/*.ts\" \"packages/*/src/**/*.ts\""
+    "lint": "eslint \"src/**/*.ts\" \"packages/**/*.ts\""
 
   },
   "dependencies": {

@@ -12,11 +12,12 @@ class TF2Class extends EventEmitter {
 
   private client: GManClient;
 
-  constructor(client: GManClient) {
+  constructor(client: any) {
     super();
-    this.client = client;
+    this.client = client && client.client ? client.client : client;
     this.init();
   }
+
 
   private init() {
     const stream = this.client.streamEvents();

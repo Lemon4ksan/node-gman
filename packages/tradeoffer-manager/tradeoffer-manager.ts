@@ -57,38 +57,50 @@ export interface Action {
   reason: string;
 }
 
-export interface EconItem {
-  appid: number;
-  contextid: string;
-  assetid: string;
-  classid: string;
-  instanceid: string;
-  amount: number;
-  pos: number;
-  id: string;
-  background_color: string;
-  icon_url: string;
-  icon_url_large: string;
-  tradable: boolean;
-  actions: any[];
-  name: string;
-  name_color: string;
-  type: string;
-  market_name: string;
-  market_hash_name: string;
-  commodity: boolean;
-  market_tradable_restriction: number;
-  market_marketable_restriction: number;
-  marketable: boolean;
-  tags: any[];
-  is_currency: boolean;
-  fraudwarnings: any[];
-  descriptions: any[];
+export class EconItem {
+  [key: string]: any;
+  appid!: number;
+  contextid!: string;
+  assetid!: string;
+  classid!: string;
+  instanceid!: string;
+  amount!: number;
+  pos!: number;
+  id!: string;
+  background_color!: string;
+  icon_url!: string;
+  icon_url_large!: string;
+  tradable!: boolean;
+  actions!: any[];
+  name!: string;
+  name_color!: string;
+  type!: string;
+  market_name!: string;
+  market_hash_name!: string;
+  commodity!: boolean;
+  market_tradable_restriction!: number;
+  market_marketable_restriction!: number;
+  marketable!: boolean;
+  tags!: any[];
+  is_currency!: boolean;
+  fraudwarnings!: any[];
+  descriptions!: any[];
   app_data?: any;
-  getAction(action: string): string | null;
-  getItemTag(category: string): string | null;
-  getSKU(schema: any, ...args: any[]): { sku: string; isPainted: boolean } | null;
+  getAction(action: string): string | null {
+    return null;
+  }
+  getItemTag(category: string): string | null {
+    return null;
+  }
+  getSKU(schema: any, ...args: any[]): { sku: string; isPainted: boolean } | null {
+    return null;
+  }
 }
+
+function assignEconItem(item: any): EconItem {
+  return Object.setPrototypeOf(item, EconItem.prototype);
+}
+
 
 export class TradeOffer {
   public partner: SteamID;
@@ -128,7 +140,7 @@ export class TradeOffer {
     tradeOffer.isOurOffer = false;
 
     if (offer.items_to_give) {
-      tradeOffer.itemsToGive = offer.items_to_give.map((item) => ({
+      tradeOffer.itemsToGive = offer.items_to_give.map((item) => assignEconItem({
         appid: item.appid || 440,
         contextid: item.contextid || '2',
         assetid: item.assetid,
@@ -162,7 +174,7 @@ export class TradeOffer {
     }
 
     if (offer.items_to_receive) {
-      tradeOffer.itemsToReceive = offer.items_to_receive.map((item) => ({
+      tradeOffer.itemsToReceive = offer.items_to_receive.map((item) => assignEconItem({
         appid: item.appid || 440,
         contextid: item.contextid || '2',
         assetid: item.assetid,
@@ -195,6 +207,7 @@ export class TradeOffer {
       }));
     }
 
+
     if (offer.data) {
       tradeOffer._data = { ...offer.data };
     }
@@ -220,7 +233,7 @@ export class TradeOffer {
   }
 
   addMyItem(item: { assetid: string; appid?: number; contextid?: string; amount?: number }): boolean {
-    this.itemsToGive.push({
+    this.itemsToGive.push(assignEconItem({
       appid: item.appid || 440,
       contextid: item.contextid || '2',
       assetid: item.assetid,
@@ -250,7 +263,7 @@ export class TradeOffer {
       getAction: () => null,
       getItemTag: () => null,
       getSKU: () => null,
-    });
+    }));
     return true;
   }
 
@@ -263,7 +276,7 @@ export class TradeOffer {
   }
 
   addTheirItem(item: { assetid: string; appid?: number; contextid?: string; amount?: number }): boolean {
-    this.itemsToReceive.push({
+    this.itemsToReceive.push(assignEconItem({
       appid: item.appid || 440,
       contextid: item.contextid || '2',
       assetid: item.assetid,
@@ -293,9 +306,10 @@ export class TradeOffer {
       getAction: () => null,
       getItemTag: () => null,
       getSKU: () => null,
-    });
+    }));
     return true;
   }
+
 
   addTheirItems(items: { assetid: string; appid?: number; contextid?: string; amount?: number }[]): number {
     let added = 0;

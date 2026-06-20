@@ -96,10 +96,11 @@ export default class SteamUser extends EventEmitter {
     ) => void;
   };
 
-  private client: GManClient;
+  public client: GManClient;
   private _loggedOn: boolean = false;
 
   constructor(client: GManClient) {
+
     super();
     this.client = client;
 
