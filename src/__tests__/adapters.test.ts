@@ -16,6 +16,7 @@ describe('SteamUserAdapter', () => {
     });
     mockClient.playGame = jest.fn().mockResolvedValue({});
     mockClient.exitGame = jest.fn().mockResolvedValue({});
+    mockClient.streamEvents = jest.fn().mockReturnValue(new EventEmitter());
   });
 
   test('should fetch status on init and emit loggedOn & webSession', (done) => {
