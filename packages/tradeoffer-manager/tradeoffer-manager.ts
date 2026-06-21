@@ -445,6 +445,7 @@ export class SteamTradeOfferManager extends EventEmitter {
 
   private _pollTimer: NodeJS.Timeout | null = null;
   private _offersCache: Map<string, TradeOffer> = new Map();
+  private _eventBusListener: any = null;
 
   static EOfferFilter = new Map([
     ['ActiveOnly', 1],
@@ -482,7 +483,65 @@ export class SteamTradeOfferManager extends EventEmitter {
     _tradeableOnly: boolean,
     callback: (err?: Error | null, inventory?: EconItem[], currency?: EconItem[]) => void
   ): void {
-    callback(null, [], []);
+    const steamID = typeof _steamID === 'string' ? new SteamID(_steamID) : _steamID;
+    const steamID64 = steamID.getSteamID64();
+
+    this.client
+      .getStatus()
+      .then((status) => {
+        const isSelf = status.steam_id === steamID64;
+        const actionPromise = isSelf
+          ? this.client.execAction(_appid, 'inventory')
+          : this.client.execAction(_appid, 'get-partner-inventory', { partner_id: steamID64 });
+
+        actionPromise
+          .then((resp) => {
+            if (!resp.items) {
+              return callback(null, [], []);
+            }
+            const mappedItems = resp.items.map((item) =>
+              assignEconItem({
+                appid: _appid,
+                contextid: _contextid,
+                assetid: item.asset_id,
+                classid: '',
+                instanceid: '',
+                amount: Number(item.quantity || 1),
+                pos: 0,
+                id: item.asset_id,
+                background_color: '',
+                icon_url: '',
+                icon_url_large: '',
+                tradable: item.is_tradable,
+                actions: [],
+                name: item.attributes?.name || '',
+                name_color: '',
+                type: '',
+                market_name: item.attributes?.market_name || item.attributes?.name || '',
+                market_hash_name: item.attributes?.market_hash_name || item.attributes?.name || '',
+                commodity: false,
+                market_tradable_restriction: 0,
+                market_marketable_restriction: 0,
+                marketable: true,
+                tags: [],
+                is_currency: false,
+                fraudwarnings: [],
+                descriptions: [],
+                getAction: () => null,
+                getItemTag: () => null,
+                getSKU: () => null,
+              })
+            );
+
+            const filtered = _tradeableOnly
+              ? mappedItems.filter((item) => item.tradable)
+              : mappedItems;
+
+            callback(null, filtered, []);
+          })
+          .catch((err) => callback(err));
+      })
+      .catch((err) => callback(err));
   }
 
   createOffer(partner: SteamID | string, _token?: string): TradeOffer {
@@ -555,12 +614,60 @@ export class SteamTradeOfferManager extends EventEmitter {
     if (this._pollTimer) return;
     this._pollTimer = setInterval(() => this.doPoll(), this.pollInterval);
     this.doPoll();
+
+    // Subscribe to G-MAN client event bus for real-time trade offer updates
+    try {
+      const bus = this.client.getEventBus();
+      
+      const newOfferListener = (gmanOffer: any) => {
+        const offer = TradeOffer.fromGManOffer(this, gmanOffer);
+        this._offersCache.set(offer.id!, offer);
+        const prevState = this.pollData.received[offer.id!];
+        if (prevState === undefined) {
+          this.pollData.received[offer.id!] = offer.state;
+          this.emit('newOffer', offer);
+        }
+      };
+
+      const offerChangedListener = (gmanOffer: any) => {
+        const offer = TradeOffer.fromGManOffer(this, gmanOffer);
+        const prevState = this.pollData.received[offer.id!] ?? this.pollData.sent[offer.id!];
+        this._offersCache.set(offer.id!, offer);
+
+        if (this.pollData.received[offer.id!] !== undefined) {
+          this.pollData.received[offer.id!] = offer.state;
+          this.emit('receivedOfferChanged', offer, prevState);
+        } else if (this.pollData.sent[offer.id!] !== undefined) {
+          this.pollData.sent[offer.id!] = offer.state;
+          this.emit('sentOfferChanged', offer, prevState);
+        } else {
+          this.pollData.received[offer.id!] = offer.state;
+          this.emit('receivedOfferChanged', offer, prevState);
+        }
+      };
+
+      bus.on('newOffer', newOfferListener);
+      bus.on('offerChanged', offerChangedListener);
+
+      this._eventBusListener = {
+        cleanup: () => {
+          bus.off('newOffer', newOfferListener);
+          bus.off('offerChanged', offerChangedListener);
+        }
+      };
+    } catch (err: any) {
+      this.emit('debug', `Failed to subscribe to event bus: ${err.message}`);
+    }
   }
 
   stopPolling(): void {
     if (this._pollTimer) {
       clearInterval(this._pollTimer);
       this._pollTimer = null;
+    }
+    if (this._eventBusListener) {
+      this._eventBusListener.cleanup();
+      this._eventBusListener = null;
     }
   }
 

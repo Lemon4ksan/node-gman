@@ -1,3 +1,7 @@
+import { RequestType } from "./proto/daemon/RequestType";
+
+export { RequestType };
+
 export interface FreeMemoryResponse {
   message: string;
   memory_bytes: string;
@@ -170,4 +174,99 @@ export interface SendOfferResponse {
 
 export interface ActiveOffersResponse {
   offers: TradeOffer[];
+}
+
+export interface ExecRequestRequest {
+  type: RequestType;
+  method?: string;
+  path?: string;
+  params?: Record<string, string>;
+  body?: string | Buffer | Uint8Array;
+  is_post_form?: boolean;
+  version?: number;
+  interface?: string;
+  action?: string;
+}
+
+export interface ExecRequestResponse {
+  success: boolean;
+  message: string;
+  body: string | Buffer | Uint8Array;
+  status_code: number;
+  eresult: number;
+  headers: Record<string, string>;
+}
+
+export interface SetFriendNicknameRequest {
+  steam_id: string;
+  nickname: string;
+}
+
+export interface SetFriendNicknameResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface GuardUnlockRequest {
+  passphrase: string;
+}
+
+export interface GuardUnlockResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface GuardTransferStartResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface GuardTransferFinishRequest {
+  sms_code: string;
+}
+
+export interface GuardTransferFinishResponse {
+  success: boolean;
+  shared_secret: string;
+  identity_secret: string;
+  revocation_code: string;
+  device_id: string;
+  uri: string;
+}
+
+export interface GuardLinkStartRequest {
+  device_id: string;
+}
+
+export interface GuardLinkStartResponse {
+  success: boolean;
+  shared_secret: string;
+  identity_secret: string;
+  revocation_code: string;
+  device_id: string;
+  uri: string;
+  phone_number_hint: string;
+  server_time: string;
+}
+
+export interface GuardLinkFinalizeRequest {
+  shared_secret: string;
+  server_time: string;
+  sms_code: string;
+  identity_secret: string;
+  device_id: string;
+}
+
+export interface GuardLinkFinalizeResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface GuardSubmitAuthCodeRequest {
+  code: string;
+}
+
+export interface GuardSubmitAuthCodeResponse {
+  success: boolean;
+  message: string;
 }

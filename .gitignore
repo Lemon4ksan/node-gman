@@ -84,5 +84,14 @@ logs/
 # ignore compiled code
 dist/
 
+# ignore compiled JS/TS outputs in source directories
+**/*.js
+**/*.js.map
+**/*.d.ts
+
+# but keep configuration files
+!eslint.config.js
+!jest.config.js
+
 # any .bat file
 *.bat

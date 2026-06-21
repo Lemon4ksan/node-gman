@@ -46,6 +46,12 @@ function printUsage() {
   console.log(
     `  ${"update-prices <entry> [entry...]".padEnd(30)} Update manual pricing database entries`,
   );
+  console.log(
+    `  ${"request <type> <args...>".padEnd(30)} Execute raw Steam request (community, unified, webapi)`,
+  );
+  console.log(
+    `  ${"nickname <steamid> [nickname]".padEnd(30)} Set or clear custom nickname for a Steam friend`,
+  );
   console.log("\nGuard Commands:");
   console.log(
     `  ${"guard status".padEnd(30)} Show Steam Guard configuration status`,
@@ -58,6 +64,9 @@ function printUsage() {
   );
   console.log(
     `  ${"guard respond <id> <accept|decline>".padEnd(30)} Accept or decline a confirmation`,
+  );
+  console.log(
+    `  ${"guard unlock <passphrase>".padEnd(30)} Unlock the daemon configuration`,
   );
   console.log(
     `  ${"guard import <shared> <identity> <device> [name] [token]".padEnd(30)} Import Steam Guard secrets`,
@@ -157,6 +166,25 @@ async function main() {
         }
         await handleUpdatePrices(client, args.slice(1));
         break;
+      case "request":
+      case "req":
+        if (args.length < 3) {
+          printRequestUsage();
+          process.exit(1);
+        }
+        await handleRequest(client, args.slice(1));
+        break;
+      case "nickname":
+        if (args.length < 2) {
+          console.error(
+            `${ColorRed}Error: 'nickname' command requires a SteamID. Example: gmanctl-node nickname 76561198000000000 "Best Friend"${ColorReset}`,
+          );
+          process.exit(1);
+        }
+        const nicknameSteamID = args[1];
+        const nicknameVal = args.slice(2).join(" ");
+        await handleSetNickname(client, nicknameSteamID, nicknameVal);
+        break;
       case "guard":
         if (args.length < 2) {
           console.error(
@@ -207,6 +235,15 @@ async function main() {
               account,
               token,
             );
+            break;
+          case "unlock":
+            if (args.length < 3) {
+              console.error(
+                `${ColorRed}Error: 'guard unlock' requires a passphrase. Example: gmanctl-node guard unlock mypass${ColorReset}`,
+              );
+              process.exit(1);
+            }
+            await handleGuardUnlock(client, args[2]);
             break;
           default:
             console.error(
@@ -516,7 +553,207 @@ async function handleGuardImport(
   }
 }
 
+function printRequestUsage() {
+  console.log(
+    `${ColorCyan}${ColorBold}Usage of 'request' command:${ColorReset}`,
+  );
+  console.log(
+    "  gmanctl-node request community <method> <path> [key=val...] [body=raw_body] [is_post_form=true]",
+  );
+  console.log(
+    "  gmanctl-node request unified <interface> <action> [version=N] [method=POST] [body=json_or_binary] [key=val...]",
+  );
+  console.log(
+    "  gmanctl-node request webapi <interface> <action> [version=N] [method=GET] [key=val...]",
+  );
+  console.log("\nExamples:");
+  console.log(
+    "  gmanctl-node request community GET profiles/76561198000000000/inventory/json/730/2",
+  );
+  console.log(
+    "  gmanctl-node request unified Player GetNickname version=1 body='{\"steamids\": [76561198000000000]}'",
+  );
+  console.log(
+    "  gmanctl-node request webapi ISteamUser GetPlayerSummaries version=2 steamids=76561198000000000",
+  );
+}
+
+async function handleRequest(client: GManClient, requestArgs: string[]) {
+  const reqTypeStr = requestArgs[0].toLowerCase();
+  let type: number;
+
+  switch (reqTypeStr) {
+    case "community":
+    case "comm":
+      type = 1; // REQUEST_TYPE_COMMUNITY
+      break;
+    case "unified":
+    case "uni":
+      type = 2; // REQUEST_TYPE_UNIFIED
+      break;
+    case "webapi":
+    case "api":
+      type = 3; // REQUEST_TYPE_WEBAPI
+      break;
+    default:
+      console.error(
+        `${ColorRed}Error: Unknown request type "${requestArgs[0]}". Expected: community, unified, webapi.${ColorReset}`,
+      );
+      process.exit(1);
+  }
+
+  const req: any = {
+    type,
+    params: {},
+  };
+
+  const keyValArgs = requestArgs.slice(3);
+  const parsed = parseKeyValArgs(keyValArgs);
+
+  if (reqTypeStr === "community" || reqTypeStr === "comm") {
+    if (requestArgs.length < 3) {
+      console.error(
+        `${ColorRed}Error: community request requires method and path (e.g., gmanctl-node request community GET profiles/.../inventory).${ColorReset}`,
+      );
+      process.exit(1);
+    }
+    req.method = requestArgs[1];
+    req.path = requestArgs[2];
+  } else {
+    if (requestArgs.length < 3) {
+      console.error(
+        `${ColorRed}Error: ${reqTypeStr} request requires interface and action (e.g., gmanctl-node request ${reqTypeStr} Player GetNickname).${ColorReset}`,
+      );
+      process.exit(1);
+    }
+    req.interface = requestArgs[1];
+    req.action = requestArgs[2];
+  }
+
+  if (parsed.body) req.body = parsed.body;
+  if (parsed.version) req.version = parsed.version;
+  if (parsed.is_post_form) req.is_post_form = parsed.is_post_form;
+  if (parsed.method) req.method = parsed.method;
+  req.params = parsed.params;
+
+  console.log(`${ColorCyan}Executing ${reqTypeStr} request to Steam...${ColorReset}`);
+  const resp = await client.execRequest(req);
+
+  if (!resp.success) {
+    console.error(`${ColorRed}Failed: ${resp.message}${ColorReset}`);
+    process.exit(1);
+  }
+
+  console.log(`${ColorBold}${ColorGreen}Request completed successfully!${ColorReset}`);
+  if (resp.status_code && resp.status_code > 0) {
+    console.log(`HTTP Status:   ${resp.status_code}`);
+  }
+  if (resp.eresult && resp.eresult > 0) {
+    console.log(`Steam EResult: ${resp.eresult}`);
+  }
+
+  if (resp.headers && Object.keys(resp.headers).length > 0) {
+    console.log(`\n${ColorBold}Response Headers:${ColorReset}`);
+    const sortedKeys = Object.keys(resp.headers).sort();
+    for (const k of sortedKeys) {
+      console.log(`  ${k}: ${resp.headers[k]}`);
+    }
+  }
+
+  if (resp.body) {
+    console.log(`\n${ColorBold}Response Body:${ColorReset}`);
+    const bodyStr = resp.body.toString();
+    const trimmed = bodyStr.trim();
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith("[") && trimmed.endsWith("]"))
+    ) {
+      try {
+        console.log(JSON.stringify(JSON.parse(bodyStr), null, 2));
+        return;
+      } catch {
+        // ignore JSON formatting err, print raw
+      }
+    }
+    console.log(bodyStr);
+  }
+}
+
+function parseKeyValArgs(args: string[]) {
+  const params: Record<string, string> = {};
+  let body: string | undefined;
+  let version: number | undefined;
+  let is_post_form: boolean | undefined;
+  let method: string | undefined;
+
+  for (const arg of args) {
+    const parts = arg.split("=");
+    if (parts.length !== 2) {
+      continue;
+    }
+    const key = parts[0];
+    const val = parts[1];
+
+    switch (key) {
+      case "body":
+        body = val;
+        break;
+      case "version":
+        const v = parseInt(val, 10);
+        if (!isNaN(v)) {
+          version = v;
+        }
+        break;
+      case "is_post_form":
+        is_post_form = val === "true" || val === "1";
+        break;
+      case "method":
+        method = val;
+        break;
+      default:
+        params[key] = val;
+    }
+  }
+
+  return { body, version, is_post_form, method, params };
+}
+
 main().catch((err) => {
   console.error(`${ColorRed}Unhandled error: ${err.message}${ColorReset}`);
   process.exit(1);
 });
+
+async function handleSetNickname(
+  client: GManClient,
+  steamId: string,
+  nickname: string,
+) {
+  if (nickname === "") {
+    console.log(
+      `${ColorCyan}Clearing nickname for SteamID ${steamId}...${ColorReset}`,
+    );
+  } else {
+    console.log(
+      `${ColorCyan}Setting nickname for SteamID ${steamId} to "${nickname}"...${ColorReset}`,
+    );
+  }
+
+  const resp = await client.setFriendNickname(steamId, nickname);
+  if (resp.success) {
+    console.log(`${ColorGreen}${resp.message}${ColorReset}`);
+  } else {
+    console.log(`${ColorRed}Failed: ${resp.message}${ColorReset}`);
+  }
+}
+
+async function handleGuardUnlock(client: GManClient, passphrase: string) {
+  console.log(
+    `${ColorCyan}Attempting to unlock daemon configuration...${ColorReset}`,
+  );
+  const resp = await client.guardUnlock(passphrase);
+  if (resp.success) {
+    console.log(`${ColorGreen}${resp.message}${ColorReset}`);
+  } else {
+    console.log(`${ColorRed}Failed: ${resp.message}${ColorReset}`);
+  }
+}

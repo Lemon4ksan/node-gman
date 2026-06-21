@@ -3,6 +3,7 @@ import * as protoLoader from "@grpc/proto-loader";
 import * as path from "path";
 import * as os from "os";
 import * as dotenv from "dotenv";
+import { EventEmitter } from "events";
 import {
   FreeMemoryResponse,
   GetStatusResponse,
@@ -18,6 +19,15 @@ import {
   GuardRespondResponse,
   GuardStatusResponse,
   GuardImportResponse,
+  ExecRequestRequest,
+  ExecRequestResponse,
+  SetFriendNicknameResponse,
+  GuardUnlockResponse,
+  GuardTransferStartResponse,
+  GuardTransferFinishResponse,
+  GuardLinkStartResponse,
+  GuardLinkFinalizeResponse,
+  GuardSubmitAuthCodeResponse,
 } from "./types";
 
 import { ProtoGrpcType } from "./proto/daemon";
@@ -32,6 +42,7 @@ export interface GManClientOptions {
 
 export class GManClient {
   private client: DaemonServiceClient;
+  private eventBus: EventEmitter | null = null;
 
   constructor(options: GManClientOptions = {}) {
     let netType = options.netType || process.env.GMAN_IPC_NET;
@@ -228,5 +239,152 @@ export class GManClient {
         },
       );
     });
+  }
+
+  execRequest(req: ExecRequestRequest): Promise<ExecRequestResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.ExecRequest(req, (err: any, response?: any) => {
+        if (err) reject(err);
+        else resolve(response);
+      });
+    });
+  }
+
+  setFriendNickname(steamId: string, nickname: string): Promise<SetFriendNicknameResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.SetFriendNickname(
+        { steam_id: steamId, nickname },
+        (err: any, response?: any) => {
+          if (err) reject(err);
+          else resolve(response);
+        },
+      );
+    });
+  }
+
+  guardUnlock(passphrase: string): Promise<GuardUnlockResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.GuardUnlock({ passphrase }, (err: any, response?: any) => {
+        if (err) reject(err);
+        else resolve(response);
+      });
+    });
+  }
+
+  guardTransferStart(): Promise<GuardTransferStartResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.GuardTransferStart({}, (err: any, response?: any) => {
+        if (err) reject(err);
+        else resolve(response);
+      });
+    });
+  }
+
+  guardTransferFinish(smsCode: string): Promise<GuardTransferFinishResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.GuardTransferFinish(
+        { sms_code: smsCode },
+        (err: any, response?: any) => {
+          if (err) reject(err);
+          else resolve(response);
+        },
+      );
+    });
+  }
+
+  guardLinkStart(deviceId: string): Promise<GuardLinkStartResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.GuardLinkStart(
+        { device_id: deviceId },
+        (err: any, response?: any) => {
+          if (err) reject(err);
+          else resolve(response);
+        },
+      );
+    });
+  }
+
+  guardLinkFinalize(
+    sharedSecret: string,
+    serverTime: string,
+    smsCode: string,
+    identitySecret: string,
+    deviceId: string,
+  ): Promise<GuardLinkFinalizeResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.GuardLinkFinalize(
+        {
+          shared_secret: sharedSecret,
+          server_time: serverTime,
+          sms_code: smsCode,
+          identity_secret: identitySecret,
+          device_id: deviceId,
+        },
+        (err: any, response?: any) => {
+          if (err) reject(err);
+          else resolve(response);
+        },
+      );
+    });
+  }
+
+  guardSubmitAuthCode(code: string): Promise<GuardSubmitAuthCodeResponse> {
+    return new Promise((resolve, reject) => {
+      this.client.GuardSubmitAuthCode({ code }, (err: any, response?: any) => {
+        if (err) reject(err);
+        else resolve(response);
+      });
+    });
+  }
+
+  async getInventory(appid: number): Promise<any[]> {
+    const resp = await this.execAction(appid, "inventory");
+    return resp.items || [];
+  }
+
+  getEventBus(): EventEmitter {
+    if (this.eventBus) return this.eventBus;
+
+    const bus = new EventEmitter();
+    this.eventBus = bus;
+    const stream = this.streamEvents();
+
+    stream.on("data", (data) => {
+      let evType = data.event_type || "";
+      const idx = evType.lastIndexOf(".");
+      if (idx !== -1) {
+        evType = evType.substring(idx + 1);
+      }
+      if (evType.startsWith("*")) {
+        evType = evType.substring(1);
+      }
+
+      let eventName = evType;
+      if (eventName.endsWith("Event")) {
+        eventName = eventName.substring(0, eventName.length - 5);
+      }
+      if (eventName.length > 0) {
+        eventName = eventName.charAt(0).toLowerCase() + eventName.slice(1);
+      }
+
+      try {
+        const payload = data.payload_json ? JSON.parse(data.payload_json) : {};
+        bus.emit(eventName, payload);
+        bus.emit("event", { type: eventName, payload });
+      } catch {
+        bus.emit(eventName, data.payload_json);
+        bus.emit("event", { type: eventName, payload: data.payload_json });
+      }
+    });
+
+    stream.on("error", (err) => {
+      bus.emit("error", err);
+    });
+
+    stream.on("end", () => {
+      bus.emit("end");
+    });
+
+    return bus;
   }
 }

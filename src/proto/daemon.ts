@@ -1,5 +1,5 @@
 import type * as grpc from '@grpc/grpc-js';
-import type { MessageTypeDefinition } from '@grpc/proto-loader';
+import type { EnumTypeDefinition, MessageTypeDefinition } from '@grpc/proto-loader';
 
 import type { DaemonServiceClient as _daemon_DaemonServiceClient, DaemonServiceDefinition as _daemon_DaemonServiceDefinition } from './daemon/DaemonService';
 
@@ -12,6 +12,8 @@ export interface ProtoGrpcType {
     DaemonService: SubtypeConstructor<typeof grpc.Client, _daemon_DaemonServiceClient> & { service: _daemon_DaemonServiceDefinition }
     ExecActionRequest: MessageTypeDefinition
     ExecActionResponse: MessageTypeDefinition
+    ExecRequestRequest: MessageTypeDefinition
+    ExecRequestResponse: MessageTypeDefinition
     ExitGameRequest: MessageTypeDefinition
     ExitGameResponse: MessageTypeDefinition
     FreeMemoryRequest: MessageTypeDefinition
@@ -23,16 +25,31 @@ export interface ProtoGrpcType {
     GuardConfirmation: MessageTypeDefinition
     GuardImportRequest: MessageTypeDefinition
     GuardImportResponse: MessageTypeDefinition
+    GuardLinkFinalizeRequest: MessageTypeDefinition
+    GuardLinkFinalizeResponse: MessageTypeDefinition
+    GuardLinkStartRequest: MessageTypeDefinition
+    GuardLinkStartResponse: MessageTypeDefinition
     GuardListRequest: MessageTypeDefinition
     GuardListResponse: MessageTypeDefinition
     GuardRespondRequest: MessageTypeDefinition
     GuardRespondResponse: MessageTypeDefinition
     GuardStatusRequest: MessageTypeDefinition
     GuardStatusResponse: MessageTypeDefinition
+    GuardSubmitAuthCodeRequest: MessageTypeDefinition
+    GuardSubmitAuthCodeResponse: MessageTypeDefinition
+    GuardTransferFinishRequest: MessageTypeDefinition
+    GuardTransferFinishResponse: MessageTypeDefinition
+    GuardTransferStartRequest: MessageTypeDefinition
+    GuardTransferStartResponse: MessageTypeDefinition
+    GuardUnlockRequest: MessageTypeDefinition
+    GuardUnlockResponse: MessageTypeDefinition
     Item: MessageTypeDefinition
     ManualPriceEntry: MessageTypeDefinition
     PlayGameRequest: MessageTypeDefinition
     PlayGameResponse: MessageTypeDefinition
+    RequestType: EnumTypeDefinition
+    SetFriendNicknameRequest: MessageTypeDefinition
+    SetFriendNicknameResponse: MessageTypeDefinition
     StopDaemonRequest: MessageTypeDefinition
     StopDaemonResponse: MessageTypeDefinition
     StreamEventsRequest: MessageTypeDefinition

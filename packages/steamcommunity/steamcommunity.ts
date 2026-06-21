@@ -35,11 +35,29 @@ export default class SteamCommunity extends EventEmitter {
   }
 
   getWebApiKey(callback: (err?: Error, key?: string) => void): void {
-    callback(new Error("Not supported via g-mand"));
+    this.client
+      .execRequest({
+        type: 1, // REQUEST_TYPE_COMMUNITY
+        method: "GET",
+        path: "dev/apikey",
+      })
+      .then((resp) => {
+        if (!resp.success) {
+          return callback(new Error(resp.message));
+        }
+        const bodyStr = resp.body.toString();
+        const match = bodyStr.match(/Key:\s*([0-9A-F]{32})/i);
+        if (match && match[1]) {
+          callback(undefined, match[1]);
+        } else {
+          callback(new Error("API key not found on page"));
+        }
+      })
+      .catch((err) => callback(err));
   }
 
   createWebApiKey(
-    _options: { domain: string; identitySecret?: string; requestID?: string },
+    options: { domain: string; identitySecret?: string; requestID?: string },
     callback: (
       err?: Error,
       result?: {
@@ -49,7 +67,38 @@ export default class SteamCommunity extends EventEmitter {
       },
     ) => void,
   ): void {
-    callback(new Error("Not supported via g-mand"));
+    const domain = options.domain || "localhost";
+    this.client
+      .execRequest({
+        type: 1, // REQUEST_TYPE_COMMUNITY
+        method: "POST",
+        path: "dev/registerkey",
+        is_post_form: true,
+        params: {
+          domain: domain,
+          agreeToTerms: "agreed",
+          Submit: "Register",
+        },
+      })
+      .then((resp) => {
+        if (!resp.success) {
+          return callback(new Error(resp.message));
+        }
+        this.getWebApiKey((err, key) => {
+          if (err) {
+            callback(err);
+          } else if (key) {
+            callback(undefined, {
+              confirmationRequired: false,
+              apiKey: key,
+              finalizeOptions: {},
+            });
+          } else {
+            callback(new Error("Failed to register API key"));
+          }
+        });
+      })
+      .catch((err) => callback(err));
   }
 
   setCookies(_cookies: string[]): void {}
@@ -127,29 +176,85 @@ export default class SteamCommunity extends EventEmitter {
   getTradeURL(
     callback: (err?: Error, url?: string, token?: string) => void,
   ): void {
-    callback(undefined, "", "");
+    this.client
+      .execRequest({
+        type: 1, // REQUEST_TYPE_COMMUNITY
+        method: "GET",
+        path: "my/tradeoffers/privacy",
+      })
+      .then((resp) => {
+        if (!resp.success) {
+          return callback(new Error(resp.message));
+        }
+        const bodyStr = resp.body.toString();
+        const urlMatch = bodyStr.match(/id="trade_offer_access_url"[^>]*value="([^"]+)"/);
+        if (urlMatch && urlMatch[1]) {
+          const tradeURL = urlMatch[1];
+          const tokenMatch = tradeURL.match(/token=([a-zA-Z0-9_-]+)/);
+          const token = tokenMatch ? tokenMatch[1] : "";
+          callback(undefined, tradeURL, token);
+        } else {
+          callback(new Error("Trade URL input field not found on page"));
+        }
+      })
+      .catch((err) => callback(err));
   }
 
   getSteamUser(
-    _id: SteamID | string,
+    id: SteamID | string,
     callback: (err?: Error, user?: any) => void,
   ): void {
-    callback(undefined, {
-      steamID: new SteamID("76561198000000000"),
-      name: "Unknown",
-      onlineState: "online",
-      stateMessage: "",
-      privacyState: "public",
-      visibilityState: "3",
-      avatarHash: "",
-      vacBanned: "0",
-      tradeBanState: "none",
-      isLimitedAccount: "0",
-      customURL: "",
-      groups: null,
-      primaryGroup: null,
-      getAvatarURL: (_size: string) => "",
-    });
+    const steamID = new SteamID(id.toString());
+    const steamID64 = steamID.getSteamID64();
+
+    this.client
+      .execRequest({
+        type: 3, // REQUEST_TYPE_WEBAPI
+        interface: "ISteamUser",
+        action: "GetPlayerSummaries",
+        version: 2,
+        method: "GET",
+        params: {
+          steamids: steamID64,
+        },
+      })
+      .then((resp) => {
+        if (!resp.success) {
+          return callback(new Error(resp.message));
+        }
+        try {
+          const data = JSON.parse(resp.body.toString());
+          const player = data?.response?.players?.[0];
+          if (!player) {
+            return callback(new Error("User not found"));
+          }
+
+          callback(undefined, {
+            steamID: steamID,
+            name: player.personaname || "Unknown",
+            onlineState: player.personastate === 0 ? "offline" : "online",
+            stateMessage: "",
+            privacyState: player.communityvisibilitystate === 3 ? "public" : "private",
+            visibilityState: String(player.communityvisibilitystate || 3),
+            avatarHash: player.avatarhash || "",
+            vacBanned: player.vacbanned ? "1" : "0",
+            tradeBanState: player.tradebanstate || "none",
+            isLimitedAccount: "0",
+            customURL: "",
+            groups: null,
+            primaryGroup: null,
+            getAvatarURL: (size: string) => {
+              const base = player.avatar || "https://avatars.steamstatic.com/fef49e7fa7e1997310d705b2a6158ff8dc1cdfeb";
+              if (size === "full" && player.avatarfull) return player.avatarfull;
+              if (size === "medium" && player.avatarmedium) return player.avatarmedium;
+              return base;
+            },
+          });
+        } catch (e: any) {
+          callback(new Error("Failed to parse user details: " + e.message));
+        }
+      })
+      .catch((err) => callback(err));
   }
 
   acceptConfirmationForObject(
@@ -163,7 +268,36 @@ export default class SteamCommunity extends EventEmitter {
   getFriendsList(
     callback: (err?: Error, friendlist?: Record<string, number>) => void,
   ): void {
-    callback(undefined, {});
+    this.client
+      .execRequest({
+        type: 2, // REQUEST_TYPE_UNIFIED
+        interface: "User",
+        action: "GetFriendList",
+        method: "POST",
+        body: JSON.stringify({
+          relationship: "friend",
+        }),
+      })
+      .then((resp) => {
+        if (!resp.success) {
+          return callback(new Error(resp.message));
+        }
+        try {
+          const data = JSON.parse(resp.body.toString());
+          const list: Record<string, number> = {};
+          if (data && data.friends) {
+            for (const f of data.friends) {
+              if (f.steamid) {
+                list[f.steamid] = 3;
+              }
+            }
+          }
+          callback(undefined, list);
+        } catch (e: any) {
+          callback(new Error("Failed to parse friends list: " + e.message));
+        }
+      })
+      .catch((err) => callback(err));
   }
 }
 
