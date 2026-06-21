@@ -1,14 +1,17 @@
 {
   "name": "@node-gman/steam-totp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Drop-in replacement for steam-totp that generates 2FA codes using g-mand daemon or local logic",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc"
   },
   "dependencies": {
-    "node-gman": "^1.0.1"
+    "node-gman": "^1.0.2"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",
