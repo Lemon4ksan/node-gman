@@ -54,6 +54,8 @@ GMAN_IPC_ADDR=127.0.0.1:50051
 const client = new GManClient({
   netType: 'unix',
   address: '/home/user/.config/gman/gman.sock',
+  autoLaunch: true,            // Spawn daemon automatically if it's not running
+  daemonPath: './bin/g-mand'   // Optional: specify path to g-mand binary
 });
 ```
 
@@ -277,6 +279,9 @@ gmanctl-node exec 440 price-check sku=5021;6
 
 # Stop daemon
 gmanctl-node stop
+
+# Auto-migrate credentials and secrets from current folder (.env or config.json)
+gmanctl-node migrate
 ```
 
 ## Example: Simple Bot
@@ -330,6 +335,17 @@ async function main() {
 
 main();
 ```
+
+## Security & Session Isolation
+
+To keep Steam accounts highly secure, **sensitive session tokens (cookies) and shared secrets are never exported over the gRPC / IPC channels** to the JS client. 
+* All authentication session cookies are kept strictly in `g-mand` daemon memory space.
+* The JS emulators (`steamcommunity` and `tradeoffer-manager`) route HTTP requests to the daemon via `ExecRequest`.
+* The daemon automatically injects the proper cookies and updates the `sessionid` parameter on the fly for every request, maintaining seamless compatibility with external frameworks (like `tf2autobot`) while minimizing the attack surface.
+
+If you really need to access the daemon's IPC channel directly, you can:
+1. Execute a GET request via `client.execRequest` on any Steam page (e.g., `/my`).
+2. In the returned HTTP headers (Headers), intercept the new `Set-Cookie` headers that Steam, and parse them.
 
 ## Drop-in Subpackages
 
