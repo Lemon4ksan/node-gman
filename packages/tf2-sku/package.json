@@ -1,6 +1,6 @@
 {
   "name": "@node-gman/tf2-sku",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Drop-in replacement for @tf2autobot/tf2-sku that routes through node-gman SKU implementation",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -8,7 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "node-gman": "^1.0.0"
+    "node-gman": "^1.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

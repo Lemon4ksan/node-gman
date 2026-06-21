@@ -1,6 +1,6 @@
 {
   "name": "node-gman",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "TypeScript/Node.js client SDK and CLI for the g-mand trade daemon",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
