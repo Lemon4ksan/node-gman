@@ -29,6 +29,9 @@ function printUsage() {
   console.log(
     `  ${"events".padEnd(30)} Stream real-time daemon and game coordinator events`,
   );
+  console.log(
+    `  ${"migrate".padEnd(30)} Auto-migrate credentials and secrets from current directory`,
+  );
   console.log("\nGame Commands:");
   console.log(
     `  ${"play <appid>".padEnd(30)} Launch game session & initialize Game Coordinator`,
@@ -95,10 +98,13 @@ async function main() {
   }
 
   const command = args[0];
-  const client = new GManClient();
+  const client = new GManClient({ autoLaunch: true });
 
   try {
     switch (command) {
+      case "migrate":
+        await handleMigrate(client);
+        break;
       case "status":
         await handleStatus(client);
         break;
@@ -755,5 +761,106 @@ async function handleGuardUnlock(client: GManClient, passphrase: string) {
     console.log(`${ColorGreen}${resp.message}${ColorReset}`);
   } else {
     console.log(`${ColorRed}Failed: ${resp.message}${ColorReset}`);
+  }
+}
+
+async function handleMigrate(client: GManClient) {
+  const fs = require("fs");
+  const path = require("path");
+
+  let foundEnv = false;
+  let foundConfig = false;
+  const credentials: Record<string, string> = {};
+
+  const envPath = path.join(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) {
+    console.log(`${ColorCyan}Found .env file. Parsing...${ColorReset}`);
+    foundEnv = true;
+    const content = fs.readFileSync(envPath, "utf8");
+    const lines = content.split(/\r?\n/);
+    for (const line of lines) {
+      const parts = line.split("=");
+      if (parts.length >= 2) {
+        const key = parts[0].trim();
+        const val = parts.slice(1).join("=").trim().replace(/^['"]|['"]$/g, "");
+        if (["STEAM_ACCOUNT_NAME", "STEAM_USERNAME", "USERNAME"].includes(key)) {
+          credentials.accountName = val;
+        } else if (["STEAM_PASSWORD", "PASSWORD"].includes(key)) {
+          credentials.password = val;
+        } else if (["STEAM_SHARED_SECRET", "SHARED_SECRET"].includes(key)) {
+          credentials.sharedSecret = val;
+        } else if (["STEAM_IDENTITY_SECRET", "IDENTITY_SECRET"].includes(key)) {
+          credentials.identitySecret = val;
+        } else if (["STEAM_DEVICE_ID", "DEVICE_ID"].includes(key)) {
+          credentials.deviceId = val;
+        }
+      }
+    }
+  }
+
+  const configPath = path.join(process.cwd(), "config.json");
+  if (fs.existsSync(configPath)) {
+    console.log(`${ColorCyan}Found config.json file. Parsing...${ColorReset}`);
+    foundConfig = true;
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      if (config.username || config.accountName || config.account_name) {
+        credentials.accountName = config.username || config.accountName || config.account_name;
+      }
+      if (config.password) {
+        credentials.password = config.password;
+      }
+      if (config.sharedSecret || config.shared_secret) {
+        credentials.sharedSecret = config.sharedSecret || config.shared_secret;
+      }
+      if (config.identitySecret || config.identity_secret) {
+        credentials.identitySecret = config.identitySecret || config.identity_secret;
+      }
+      if (config.deviceId || config.device_id) {
+        credentials.deviceId = config.deviceId || config.device_id;
+      }
+    } catch (e: any) {
+      console.warn(`${ColorYellow}Warning: Failed to parse config.json: ${e.message}${ColorReset}`);
+    }
+  }
+
+  if (!foundEnv && !foundConfig) {
+    console.error(
+      `${ColorRed}Error: No .env or config.json found in the current working directory (${process.cwd()}).${ColorReset}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`\n${ColorBold}Extracted Credentials:${ColorReset}`);
+  console.log(`  Account Name:    ${credentials.accountName || `${ColorGray}(not found)${ColorReset}`}`);
+  console.log(`  Password:        ${credentials.password ? `${ColorGreen}*****${ColorReset}` : `${ColorGray}(not found)${ColorReset}`}`);
+  console.log(`  Shared Secret:   ${credentials.sharedSecret ? `${ColorGreen}*****${ColorReset}` : `${ColorGray}(not found)${ColorReset}`}`);
+  console.log(`  Identity Secret: ${credentials.identitySecret ? `${ColorGreen}*****${ColorReset}` : `${ColorGray}(not found)${ColorReset}`}`);
+  console.log(`  Device ID:       ${credentials.deviceId || `${ColorGray}(not found)${ColorReset}`}`);
+
+  if (!credentials.sharedSecret || !credentials.identitySecret || !credentials.deviceId) {
+    console.error(
+      `\n${ColorRed}Error: Missing required Steam Guard secrets (sharedSecret, identitySecret, and deviceId must all be configured).${ColorReset}`,
+    );
+    process.exit(1);
+  }
+
+  console.log(`\n${ColorCyan}Importing secrets into the G-MAN daemon...${ColorReset}`);
+  try {
+    const resp = await client.guardImport(
+      credentials.sharedSecret,
+      credentials.identitySecret,
+      credentials.deviceId,
+      credentials.accountName || "",
+    );
+    if (resp.success) {
+      console.log(`${ColorBold}${ColorGreen}Success: ${resp.message}${ColorReset}`);
+    } else {
+      console.error(`${ColorRed}Daemon Import Failed: ${resp.message}${ColorReset}`);
+      process.exit(1);
+    }
+  } catch (err: any) {
+    console.error(`${ColorRed}Error calling daemon: ${err.message}${ColorReset}`);
+    process.exit(1);
   }
 }

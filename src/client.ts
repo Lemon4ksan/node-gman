@@ -38,13 +38,21 @@ dotenv.config();
 export interface GManClientOptions {
   netType?: "tcp" | "unix";
   address?: string;
+  autoLaunch?: boolean;
+  daemonPath?: string;
 }
 
 export class GManClient {
   private client: DaemonServiceClient;
   private eventBus: EventEmitter | null = null;
+  private autoLaunch: boolean = false;
+  private daemonPath: string = "";
+  private launchPromise: Promise<void> | null = null;
 
   constructor(options: GManClientOptions = {}) {
+    this.autoLaunch = options.autoLaunch || false;
+    this.daemonPath = options.daemonPath || "";
+
     let netType = options.netType || process.env.GMAN_IPC_NET;
     let address = options.address || process.env.GMAN_IPC_ADDR;
 
@@ -92,13 +100,90 @@ export class GManClient {
     });
   }
 
+  private async ensureConnected(): Promise<void> {
+    if (!this.autoLaunch) return;
+    if (this.launchPromise) return this.launchPromise;
+
+    this.launchPromise = (async () => {
+      const running = await this.pingDaemon();
+      if (running) return;
+
+      console.log("G-MAN daemon not running. Attempting to auto-launch...");
+      await this.spawnDaemon();
+    })();
+
+    return this.launchPromise;
+  }
+
+  private pingDaemon(): Promise<boolean> {
+    return new Promise((resolve) => {
+      this.client.GetStatus({}, (err: any) => {
+        if (err) {
+          resolve(false);
+        } else {
+          resolve(true);
+        }
+      });
+    });
+  }
+
+  private async spawnDaemon(): Promise<void> {
+    const { spawn } = require("child_process");
+    const fs = require("fs");
+    const path = require("path");
+
+    let binName = os.platform() === "win32" ? "g-mand.exe" : "g-mand";
+    let pathsToTry = [
+      this.daemonPath,
+      path.join(process.cwd(), binName),
+      path.join(process.cwd(), "bin", binName),
+      // Sibling workspace paths
+      path.join(__dirname, "../../g-man-cli/bin", binName),
+      path.join(__dirname, "../../g-man-cli", binName),
+      path.join(__dirname, "../../../g-man-cli/bin", binName),
+    ].filter(Boolean);
+
+    let foundPath = "";
+    for (const p of pathsToTry) {
+      const resolved = path.resolve(p);
+      if (fs.existsSync(resolved)) {
+        foundPath = resolved;
+        break;
+      }
+    }
+
+    if (!foundPath) {
+      foundPath = binName;
+    }
+
+    console.log(`Spawning daemon from: ${foundPath}`);
+
+    const daemonProc = spawn(foundPath, [], {
+      detached: true,
+      stdio: "ignore",
+    });
+    daemonProc.unref();
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const ok = await this.pingDaemon();
+      if (ok) {
+        console.log("G-MAN daemon successfully launched and connected!");
+        return;
+      }
+    }
+
+    throw new Error("Failed to connect to G-MAN daemon after auto-launching.");
+  }
+
   close(): void {
     if (this.client) {
       this.client.close();
     }
   }
 
-  getStatus(): Promise<GetStatusResponse> {
+  async getStatus(): Promise<GetStatusResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GetStatus({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -107,7 +192,8 @@ export class GManClient {
     });
   }
 
-  stopDaemon(): Promise<StopDaemonResponse> {
+  async stopDaemon(): Promise<StopDaemonResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.StopDaemon({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -116,7 +202,8 @@ export class GManClient {
     });
   }
 
-  playGame(appid: number): Promise<PlayGameResponse> {
+  async playGame(appid: number): Promise<PlayGameResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.PlayGame({ appid }, (err: any, response?: any) => {
         if (err) reject(err);
@@ -125,7 +212,8 @@ export class GManClient {
     });
   }
 
-  exitGame(): Promise<ExitGameResponse> {
+  async exitGame(): Promise<ExitGameResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.ExitGame({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -134,11 +222,12 @@ export class GManClient {
     });
   }
 
-  execAction(
+  async execAction(
     appid: number,
     action: string,
     params: Record<string, string> = {},
   ): Promise<ExecActionResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.ExecAction(
         { appid, action, params },
@@ -150,7 +239,8 @@ export class GManClient {
     });
   }
 
-  freeMemory(): Promise<FreeMemoryResponse> {
+  async freeMemory(): Promise<FreeMemoryResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.FreeMemory({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -160,12 +250,14 @@ export class GManClient {
   }
 
   streamEvents(): grpc.ClientReadableStream<StreamEventsResponse> {
+    this.ensureConnected().catch(() => {});
     return this.client.StreamEvents({}) as any;
   }
 
-  updateManualPrices(
+  async updateManualPrices(
     prices: Record<string, ManualPriceEntry>,
   ): Promise<UpdateManualPricesResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.UpdateManualPrices({ prices }, (err: any, response?: any) => {
         if (err) reject(err);
@@ -174,7 +266,8 @@ export class GManClient {
     });
   }
 
-  guardCode(): Promise<GuardCodeResponse> {
+  async guardCode(): Promise<GuardCodeResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardCode({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -183,7 +276,8 @@ export class GManClient {
     });
   }
 
-  guardStatus(): Promise<GuardStatusResponse> {
+  async guardStatus(): Promise<GuardStatusResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardStatus({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -192,7 +286,8 @@ export class GManClient {
     });
   }
 
-  guardList(): Promise<GuardListResponse> {
+  async guardList(): Promise<GuardListResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardList({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -201,11 +296,12 @@ export class GManClient {
     });
   }
 
-  guardRespond(
+  async guardRespond(
     confirmationId: string,
     accept: boolean,
     all: boolean = false,
   ): Promise<GuardRespondResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardRespond(
         { confirmation_id: confirmationId, accept, all },
@@ -217,13 +313,14 @@ export class GManClient {
     });
   }
 
-  guardImport(
+  async guardImport(
     sharedSecret: string,
     identitySecret: string,
     deviceId: string,
     accountName: string,
     refreshToken: string = "",
   ): Promise<GuardImportResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardImport(
         {
@@ -241,7 +338,8 @@ export class GManClient {
     });
   }
 
-  execRequest(req: ExecRequestRequest): Promise<ExecRequestResponse> {
+  async execRequest(req: ExecRequestRequest): Promise<ExecRequestResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.ExecRequest(req, (err: any, response?: any) => {
         if (err) reject(err);
@@ -250,7 +348,8 @@ export class GManClient {
     });
   }
 
-  setFriendNickname(steamId: string, nickname: string): Promise<SetFriendNicknameResponse> {
+  async setFriendNickname(steamId: string, nickname: string): Promise<SetFriendNicknameResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.SetFriendNickname(
         { steam_id: steamId, nickname },
@@ -262,7 +361,8 @@ export class GManClient {
     });
   }
 
-  guardUnlock(passphrase: string): Promise<GuardUnlockResponse> {
+  async guardUnlock(passphrase: string): Promise<GuardUnlockResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardUnlock({ passphrase }, (err: any, response?: any) => {
         if (err) reject(err);
@@ -271,7 +371,8 @@ export class GManClient {
     });
   }
 
-  guardTransferStart(): Promise<GuardTransferStartResponse> {
+  async guardTransferStart(): Promise<GuardTransferStartResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardTransferStart({}, (err: any, response?: any) => {
         if (err) reject(err);
@@ -280,7 +381,8 @@ export class GManClient {
     });
   }
 
-  guardTransferFinish(smsCode: string): Promise<GuardTransferFinishResponse> {
+  async guardTransferFinish(smsCode: string): Promise<GuardTransferFinishResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardTransferFinish(
         { sms_code: smsCode },
@@ -292,7 +394,8 @@ export class GManClient {
     });
   }
 
-  guardLinkStart(deviceId: string): Promise<GuardLinkStartResponse> {
+  async guardLinkStart(deviceId: string): Promise<GuardLinkStartResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardLinkStart(
         { device_id: deviceId },
@@ -304,13 +407,14 @@ export class GManClient {
     });
   }
 
-  guardLinkFinalize(
+  async guardLinkFinalize(
     sharedSecret: string,
     serverTime: string,
     smsCode: string,
     identitySecret: string,
     deviceId: string,
   ): Promise<GuardLinkFinalizeResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardLinkFinalize(
         {
@@ -328,7 +432,8 @@ export class GManClient {
     });
   }
 
-  guardSubmitAuthCode(code: string): Promise<GuardSubmitAuthCodeResponse> {
+  async guardSubmitAuthCode(code: string): Promise<GuardSubmitAuthCodeResponse> {
+    await this.ensureConnected();
     return new Promise((resolve, reject) => {
       this.client.GuardSubmitAuthCode({ code }, (err: any, response?: any) => {
         if (err) reject(err);
