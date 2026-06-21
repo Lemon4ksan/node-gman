@@ -4,7 +4,7 @@ else
     RUN_NPM := npm
 endif
 
-.PHONY: all build build-sdk build-steam-totp build-steam-user build-steamcommunity build-tf2 build-tf2-currencies build-tf2-sku build-tradeoffer-manager test lint clean
+.PHONY: all build build-sdk build-steam-totp build-steam-user build-steamcommunity build-tf2 build-tf2-currencies build-tf2-sku build-tradeoffer-manager test lint clean publish
 
 all: build test lint
 
@@ -39,6 +39,18 @@ test:
 
 lint:
 	$(RUN_NPM) run lint
+
+publish: build
+	@echo Publishing root SDK to npm...
+	$(RUN_NPM) publish
+	@echo Publishing subpackages to npm...
+	cd packages/steam-totp && $(RUN_NPM) publish --access public
+	cd packages/steam-user && $(RUN_NPM) publish --access public
+	cd packages/steamcommunity && $(RUN_NPM) publish --access public
+	cd packages/tf2 && $(RUN_NPM) publish --access public
+	cd packages/tf2-currencies && $(RUN_NPM) publish --access public
+	cd packages/tf2-sku && $(RUN_NPM) publish --access public
+	cd packages/tradeoffer-manager && $(RUN_NPM) publish --access public
 
 clean:
 	@echo Cleaning root build outputs...
