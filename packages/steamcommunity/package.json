@@ -1,6 +1,6 @@
 {
   "name": "@node-gman/steamcommunity",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Drop-in replacement for @tf2autobot/steamcommunity that routes through g-mand daemon",
   "main": "index.js",
   "types": "index.d.ts",
@@ -15,7 +15,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "node-gman": "^1.0.2",
+    "node-gman": "^1.1.0",
     "steamid": "^2.1.0"
   },
   "devDependencies": {

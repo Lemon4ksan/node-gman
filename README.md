@@ -365,13 +365,13 @@ You can drop these replacements into your existing project's `package.json` usin
 
 ```json
 "dependencies": {
-  "steam-totp": "npm:@node-gman/steam-totp@^1.0.2",
-  "steam-user": "npm:@node-gman/steam-user@^1.0.2",
-  "@tf2autobot/tradeoffer-manager": "npm:@node-gman/tradeoffer-manager@^1.0.2",
-  "@tf2autobot/tf2": "npm:@node-gman/tf2@^1.0.2",
-  "@tf2autobot/steamcommunity": "npm:@node-gman/steamcommunity@^1.0.2",
-  "@tf2autobot/tf2-sku": "npm:@node-gman/tf2-sku@^1.0.2",
-  "@tf2autobot/tf2-currencies": "npm:@node-gman/tf2-currencies@^1.0.2"
+  "steam-totp": "npm:@node-gman/steam-totp@^1.1.0",
+  "steam-user": "npm:@node-gman/steam-user@^1.1.0",
+  "@tf2autobot/tradeoffer-manager": "npm:@node-gman/tradeoffer-manager@^1.1.0",
+  "@tf2autobot/tf2": "npm:@node-gman/tf2@^1.1.0",
+  "@tf2autobot/steamcommunity": "npm:@node-gman/steamcommunity@^1.1.0",
+  "@tf2autobot/tf2-sku": "npm:@node-gman/tf2-sku@^1.1.0",
+  "@tf2autobot/tf2-currencies": "npm:@node-gman/tf2-currencies@^1.1.0"
 }
 ```
 

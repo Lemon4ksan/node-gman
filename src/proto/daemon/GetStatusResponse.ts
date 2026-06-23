@@ -18,6 +18,8 @@ export interface GetStatusResponse {
   'is_community_banned'?: (boolean);
   'vac_bans_count'?: (number);
   'email_address'?: (string);
+  'trusted_ids'?: (string)[];
+  'excluded_ids'?: (string)[];
 }
 
 export interface GetStatusResponse__Output {
@@ -36,4 +38,6 @@ export interface GetStatusResponse__Output {
   'is_community_banned': (boolean);
   'vac_bans_count': (number);
   'email_address': (string);
+  'trusted_ids': (string)[];
+  'excluded_ids': (string)[];
 }
