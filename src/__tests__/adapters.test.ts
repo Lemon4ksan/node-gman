@@ -59,6 +59,72 @@ describe('SteamUserAdapter', () => {
       done();
     });
   });
+
+  test('should handle friend operations and myFriends dictionary', (done) => {
+    mockClient.execRequest = jest.fn().mockResolvedValue({ success: true });
+    mockClient.setFriendNickname = jest.fn().mockResolvedValue({ success: true, message: 'OK' });
+    const adapter = new SteamUserAdapter(mockClient);
+
+    const testSteamID = '76561198012345678';
+    adapter.addFriend(testSteamID, (err, personaName) => {
+      expect(err).toBeUndefined();
+      expect(personaName).toBe(testSteamID);
+      expect(adapter.myFriends[testSteamID]).toBe(3); // EFriendRelationship.Friend
+
+      adapter.setFriendNickname(testSteamID, 'Best Buddy', (nErr, resp) => {
+        expect(nErr).toBeUndefined();
+        expect(mockClient.setFriendNickname).toHaveBeenCalledWith(testSteamID, 'Best Buddy');
+
+        adapter.removeFriend(testSteamID, (rErr) => {
+          expect(rErr).toBeUndefined();
+          expect(adapter.myFriends[testSteamID]).toBeUndefined();
+          done();
+        });
+      });
+    });
+  });
+
+  test('should parse FriendMessageEvent and FriendRelationshipEvent from stream', (done) => {
+    const mockStream = new EventEmitter();
+    mockClient.streamEvents = jest.fn().mockReturnValue(mockStream as any);
+    const adapter = new SteamUserAdapter(mockClient);
+
+    let messageHandled = false;
+    let relationshipHandled = false;
+
+    adapter.on('friendMessage', (senderID, message) => {
+      expect(senderID.getSteamID64()).toBe('76561198012345678');
+      expect(message).toBe('Hello from TF2Bot!');
+      messageHandled = true;
+      if (messageHandled && relationshipHandled) done();
+    });
+
+    adapter.on('friendRelationship', (steamID, relationship) => {
+      expect(steamID.getSteamID64()).toBe('76561198087654321');
+      expect(relationship).toBe(3);
+      expect(adapter.myFriends['76561198087654321']).toBe(3);
+      relationshipHandled = true;
+      if (messageHandled && relationshipHandled) done();
+    });
+
+    process.nextTick(() => {
+      mockStream.emit('data', {
+        event_type: 'daemon.FriendMessageEvent',
+        payload_json: JSON.stringify({
+          SenderID: '76561198012345678',
+          Message: 'Hello from TF2Bot!',
+        }),
+      });
+
+      mockStream.emit('data', {
+        event_type: 'daemon.FriendRelationshipEvent',
+        payload_json: JSON.stringify({
+          SteamID: '76561198087654321',
+          Relationship: 3,
+        }),
+      });
+    });
+  });
 });
 
 describe('TeamFortress2Adapter', () => {

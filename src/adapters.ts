@@ -2,13 +2,60 @@ import { EventEmitter } from "events";
 import { GManClient } from "./client";
 import { StreamEventsResponse } from "./types";
 
+function toSteamIDObj(id: any): any {
+  if (typeof id === "object" && id !== null && typeof id.getSteamID64 === "function") {
+    return id;
+  }
+  const str = String(id);
+  return {
+    getSteamID64: () => str,
+    toString: () => str,
+  };
+}
+
 export class SteamUserAdapter extends EventEmitter {
   public steamID: any = null;
+  public myFriends: Record<string, number> = {};
+  public users: Record<string, any> = {};
+  public chat: {
+    sendFriendMessage: (
+      steamID: any,
+      message: string,
+      options?: any,
+      callback?: (err: Error | null, response?: any) => void,
+    ) => void;
+  };
   private client: GManClient;
 
   constructor(client: GManClient) {
     super();
     this.client = client;
+
+    this.chat = {
+      sendFriendMessage: (
+        steamID: any,
+        message: string,
+        _options?: any,
+        callback?: (err: Error | null, response?: any) => void,
+      ) => {
+        const id =
+          typeof steamID === "string" ? steamID : steamID.getSteamID64();
+        this.client
+          .execAction(440, "send-chat", { steam_id: id, message })
+          .then(() => {
+            if (callback)
+              callback(null, {
+                modified_message: message,
+                server_timestamp: new Date(),
+                ordinal: 0,
+              });
+          })
+          .catch((err: Error) => {
+            if (callback) callback(err);
+          });
+      },
+    };
+
     this.init();
   }
 
@@ -45,18 +92,49 @@ export class SteamUserAdapter extends EventEmitter {
             evType = evType.substring(1);
           }
 
-          if (evType === "MessageEvent") {
-            try {
-              const safeJson = data.payload_json.replace(/:\s*(\d{15,})/g, ':"$1"');
-              const payload = JSON.parse(safeJson);
-              if (payload.SenderID && payload.Message) {
-                const SteamID = require("steamid");
-                const senderID = new SteamID(payload.SenderID.toString());
-                this.emit("friendMessage", senderID, payload.Message);
+          try {
+            const safeJson = data.payload_json.replace(
+              /:\s*(\d{15,})/g,
+              ':"$1"',
+            );
+            const payload = JSON.parse(safeJson);
+
+            if (evType === "MessageEvent" || evType === "FriendMessageEvent") {
+              const sid =
+                payload.SenderID ||
+                payload.sender_id ||
+                payload.steam_id ||
+                payload.steamid;
+              const msg = payload.Message || payload.message;
+              if (sid && msg) {
+                const senderID = toSteamIDObj(sid);
+                this.emit("friendMessage", senderID, msg);
               }
-            } catch (e) {
-              // ignore
+            } else if (
+              evType === "FriendRelationshipEvent" ||
+              evType === "FriendRelationship" ||
+              evType === "RelationshipEvent"
+            ) {
+              const sid =
+                payload.SteamID || payload.steam_id || payload.steamid;
+              const rel =
+                payload.Relationship !== undefined
+                  ? payload.Relationship
+                  : payload.relationship;
+              if (sid && rel !== undefined) {
+                const targetID = toSteamIDObj(sid);
+                const target64 = targetID.getSteamID64();
+                const relNum = Number(rel);
+                if (relNum === 0) {
+                  delete this.myFriends[target64];
+                } else {
+                  this.myFriends[target64] = relNum;
+                }
+                this.emit("friendRelationship", targetID, relNum);
+              }
             }
+          } catch (e) {
+            // ignore
           }
         });
         stream.on("error", (err: any) => {
@@ -91,10 +169,80 @@ export class SteamUserAdapter extends EventEmitter {
   }
 
   chatMessage(steamID: string, message: string) {
-    // No-op (handled inside high-level chat systems or logging)
-    console.log(
-      `[SteamUserAdapter] Mock chatMessage to ${steamID}: ${message}`,
-    );
+    this.client
+      .execAction(440, "send-chat", { steam_id: steamID, message })
+      .catch((err) => this.emit("error", err));
+  }
+
+  addFriend(steamID: any, callback?: (err?: Error, personaName?: string) => void) {
+    const steamIDInstance = toSteamIDObj(steamID);
+    const steamID64 = steamIDInstance.getSteamID64();
+
+    this.myFriends[steamID64] = 3; // Friend
+    this.client
+      .execRequest({
+        type: 2,
+        interface: "User",
+        action: "AddFriend",
+        method: "POST",
+        body: Buffer.from(JSON.stringify({ steamid: steamID64 })),
+      })
+      .catch(() => {})
+      .finally(() => {
+        this.emit("friendRelationship", steamIDInstance, 3);
+        if (callback) callback(undefined, steamID64);
+      });
+  }
+
+  removeFriend(steamID: any, callback?: (err?: Error) => void) {
+    const steamIDInstance = toSteamIDObj(steamID);
+    const steamID64 = steamIDInstance.getSteamID64();
+
+    delete this.myFriends[steamID64];
+    this.client
+      .execRequest({
+        type: 2,
+        interface: "User",
+        action: "RemoveFriend",
+        method: "POST",
+        body: Buffer.from(JSON.stringify({ steamid: steamID64 })),
+      })
+      .catch(() => {})
+      .finally(() => {
+        this.emit("friendRelationship", steamIDInstance, 0);
+        if (callback) callback();
+      });
+  }
+
+  blockUser(steamID: any, callback?: (err?: Error) => void) {
+    const steamIDInstance = toSteamIDObj(steamID);
+    const steamID64 = steamIDInstance.getSteamID64();
+
+    this.myFriends[steamID64] = 1; // Blocked
+    this.emit("friendRelationship", steamIDInstance, 1);
+    if (callback) callback();
+  }
+
+  unblockUser(steamID: any, callback?: (err?: Error) => void) {
+    const steamIDInstance = toSteamIDObj(steamID);
+    const steamID64 = steamIDInstance.getSteamID64();
+
+    delete this.myFriends[steamID64];
+    this.emit("friendRelationship", steamIDInstance, 0);
+    if (callback) callback();
+  }
+
+  setFriendNickname(steamID: any, nickname: string, callback?: (err?: Error, resp?: any) => void) {
+    const steamID64 =
+      typeof steamID === "string" ? steamID : steamID.getSteamID64();
+    this.client
+      .setFriendNickname(steamID64, nickname)
+      .then((resp) => {
+        if (callback) callback(undefined, resp);
+      })
+      .catch((err) => {
+        if (callback) callback(err);
+      });
   }
 
   webLogOn() {
