@@ -180,6 +180,9 @@ async function main() {
         }
         await handleRequest(client, args.slice(1));
         break;
+      case "friends":
+        await handleFriendsList(client);
+        break;
       case "nickname":
         if (args.length < 2) {
           console.error(
@@ -194,7 +197,7 @@ async function main() {
       case "guard":
         if (args.length < 2) {
           console.error(
-            `${ColorRed}Error: 'guard' command requires a subcommand (status, code, list, respond, import)${ColorReset}`,
+            `${ColorRed}Error: 'guard' command requires a subcommand (status, code, auth, list, respond, accept-all, cancel-all, import, unlock)${ColorReset}`,
           );
           process.exit(1);
         }
@@ -206,8 +209,23 @@ async function main() {
           case "code":
             await handleGuardCode(client);
             break;
+          case "auth":
+            if (args.length < 3) {
+              console.error(
+                `${ColorRed}Error: 'guard auth' requires a code. Example: gmanctl-node guard auth 12345${ColorReset}`,
+              );
+              process.exit(1);
+            }
+            await handleGuardSubmitAuthCode(client, args[2]);
+            break;
           case "list":
             await handleGuardList(client);
+            break;
+          case "accept-all":
+            await handleGuardRespond(client, "", true, true);
+            break;
+          case "cancel-all":
+            await handleGuardRespond(client, "", false, true);
             break;
           case "respond":
             if (args.length < 4) {
@@ -522,13 +540,15 @@ async function handleGuardRespond(
   client: GManClient,
   confirmationId: string,
   accept: boolean,
+  all: boolean = false,
 ) {
   const action = accept ? "accepting" : "declining";
+  const target = all ? "all confirmations" : `confirmation ${confirmationId}`;
   console.log(
-    `${ColorCyan}${action} confirmation ${confirmationId}...${ColorReset}`,
+    `${ColorCyan}${action} ${target}...${ColorReset}`,
   );
 
-  const resp = await client.guardRespond(confirmationId, accept);
+  const resp = await client.guardRespond(confirmationId, accept, all);
   if (resp.success) {
     console.log(`${ColorGreen}${resp.message}${ColorReset}`);
   } else {
@@ -862,5 +882,53 @@ async function handleMigrate(client: GManClient) {
   } catch (err: any) {
     console.error(`${ColorRed}Error calling daemon: ${err.message}${ColorReset}`);
     process.exit(1);
+  }
+}
+
+async function handleGuardSubmitAuthCode(client: GManClient, code: string) {
+  console.log(`${ColorCyan}Submitting Steam Guard code to daemon...${ColorReset}`);
+  const resp = await client.guardSubmitAuthCode(code);
+  if (resp.success) {
+    console.log(`${ColorGreen}${resp.message}${ColorReset}`);
+  } else {
+    console.log(`${ColorRed}Failed: ${resp.message}${ColorReset}`);
+  }
+}
+
+async function handleFriendsList(client: GManClient) {
+  console.log(`${ColorCyan}Fetching friends list...${ColorReset}`);
+  try {
+    const resp = await client.execRequest({
+      type: 2, // REQUEST_TYPE_UNIFIED
+      interface: "User",
+      action: "GetFriendList",
+      method: "POST",
+      body: Buffer.from(JSON.stringify({ relationship: "friend" })),
+    });
+    if (!resp.success) {
+      console.log(`${ColorRed}Failed to fetch friends list: ${resp.message}${ColorReset}`);
+      return;
+    }
+    const data = JSON.parse(resp.body.toString());
+    const friends: any[] = data.friends || data.friendslist?.friends || [];
+    if (friends.length === 0) {
+      console.log(`${ColorGray}No friends found${ColorReset}`);
+      return;
+    }
+    console.log(
+      `${ColorBold}${ColorCyan}=== FRIENDS LIST (${friends.length}) ===${ColorReset}`,
+    );
+    for (let i = 0; i < friends.length; i++) {
+      const f = friends[i];
+      const sid = f.steamid || f.steam_id;
+      const rel = f.relationship || "friend";
+      console.log(
+        `${ColorBold}[${i + 1}]${ColorReset} ${ColorYellow}${sid}${ColorReset} (${ColorGreen}${rel}${ColorReset})`,
+      );
+    }
+  } catch (err: any) {
+    console.error(
+      `${ColorRed}Error fetching friends list: ${err.message}${ColorReset}`,
+    );
   }
 }
